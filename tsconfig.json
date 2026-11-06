@@ -10,7 +10,11 @@
     "skipLibCheck": true,
     "types": ["void/env", "node"],
     "jsx": "react-jsx",
-    "paths": { "@/*": ["./src/*"] }
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
   },
-  "include": ["src", "pages", "routes", "db", "tests", "*.ts"]
+  "include": ["src", "pages", "routes", "db", "tests", "*.ts", "scripts/**/*.ts"]
 }

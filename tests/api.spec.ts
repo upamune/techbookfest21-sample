@@ -2,7 +2,24 @@ import { expect, test } from "@playwright/test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { z } from "zod";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { taskResponse, tasksResponse, deletionResponse } from "../src/tasks/contracts";
+
+const execute = promisify(execFile);
+
+async function runCli(args: string[]) {
+  const env = { ...process.env };
+  delete env.FORCE_COLOR;
+  delete env.NO_COLOR;
+  const { stdout, stderr } = await execute(process.execPath, ["scripts/tasks.ts", ...args], {
+    timeout: 15000,
+    env,
+  });
+  expect(stderr).toBe("");
+  const result: unknown = JSON.parse(stdout);
+  return result;
+}
 
 function toolData(result: unknown): unknown {
   const envelope = z
@@ -14,9 +31,17 @@ function toolData(result: unknown): unknown {
 
 test("HTTP and MCP share persistent tasks and idempotent mutations", async ({ request }) => {
   const client = new Client({ name: "task-lab-test", version: "1.0.0" });
-  await client.connect(new StreamableHTTPClientTransport(new URL("http://127.0.0.1:5273/api/mcp")));
+  await client.connect(new StreamableHTTPClientTransport(new URL("http://127.0.0.1:5273/mcp")));
   let id: string | undefined;
   try {
+    await expect(
+      runCli([
+        "call",
+        "set_task_completed",
+        JSON.stringify({ id: crypto.randomUUID(), completed: true }),
+        "--confirm",
+      ]),
+    ).rejects.toMatchObject({ code: 1, stdout: "" });
     expect((await client.listTools()).tools.map((tool) => tool.name).sort()).toEqual([
       "create_task",
       "delete_task",
@@ -85,7 +110,7 @@ test("input, origin and production boundaries fail closed", async ({ request }) 
     413,
   );
   expect((await request.delete("/api/tasks/invalid")).status()).toBe(400);
-  for (const path of ["/api/tasks", "/api/mcp"]) {
+  for (const path of ["/api/tasks", "/mcp", "/api/mcp"]) {
     expect(
       (await request.get(path, { headers: { origin: "https://untrusted.example" } })).status(),
     ).toBe(403);
@@ -101,5 +126,68 @@ test("input, origin and production boundaries fail closed", async ({ request }) 
 test("SSR serves the application shell", async ({ request }) => {
   const response = await request.get("/");
   expect(response.ok()).toBe(true);
-  expect(await response.text()).toContain("次の一歩を、ひとつずつ。");
+  expect(await response.text()).toContain("やることを追加して、終わったらチェック。");
+});
+
+test("legacy MCP endpoint advertises the same tools", async () => {
+  const client = new Client({ name: "legacy-test", version: "1.0.0" });
+  try {
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL("http://127.0.0.1:5273/api/mcp")),
+    );
+    expect((await client.listTools()).tools.map((tool) => tool.name).sort()).toEqual([
+      "create_task",
+      "delete_task",
+      "list_tasks",
+      "set_task_completed",
+    ]);
+  } finally {
+    await client.close();
+  }
+});
+
+test("CLI uses the same persisted data and requires explicit writes", async ({ request }) => {
+  const tools = z
+    .object({ tools: z.array(z.object({ name: z.string() })) })
+    .parse(await runCli(["list"]));
+  expect(tools.tools.map((tool) => tool.name)).toContain("create_task");
+  await expect(
+    execute(process.execPath, ["scripts/tasks.ts", "call", "create_task", '{"title":"blocked"}']),
+  ).rejects.toMatchObject({ code: 1 });
+  const { task } = taskResponse.parse(
+    toolData(
+      await runCli([
+        "call",
+        "create_task",
+        JSON.stringify({ title: `CLI ${crypto.randomUUID()}` }),
+        "--confirm",
+      ]),
+    ),
+  );
+  try {
+    expect(
+      tasksResponse.parse(await (await request.get("/api/tasks")).json()).tasks,
+    ).toContainEqual(task);
+    expect(
+      taskResponse.parse(
+        toolData(
+          await runCli([
+            "call",
+            "set_task_completed",
+            JSON.stringify({ id: task.id, completed: true }),
+            "--confirm",
+          ]),
+        ),
+      ).task.completed,
+    ).toBe(true);
+    expect(
+      deletionResponse.parse(
+        toolData(
+          await runCli(["call", "delete_task", JSON.stringify({ id: task.id }), "--confirm"]),
+        ),
+      ).deleted,
+    ).toBe(true);
+  } finally {
+    await request.delete(`/api/tasks/${task.id}`);
+  }
 });

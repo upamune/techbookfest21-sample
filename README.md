@@ -19,11 +19,28 @@ http://127.0.0.1:5273 を開きます。初回起動でローカルD1へmigratio
 
 - タスクの追加、一覧、完了状態の設定、削除確認。
 - 初回ロード失敗の再試行、操作失敗の表示、入力保持、連打防止。
+- UI通信は10秒で打ち切り、書込みを自動再送しません。結果が不明なら再読込みで確認してください。
+- キーボード操作・削除確認後のフォーカス復帰・reduced motionに対応。動きは短い操作フィードバックに限定。
 - HTTP: GET/POST `/api/tasks`、PATCH/DELETE `/api/tasks/:id`。
-- MCP: `http://127.0.0.1:5273/api/mcp`、標準Streamable HTTP。
+- MCP: `http://127.0.0.1:5273/mcp`、標準Streamable HTTP。
+- 旧 `/api/mcp` も互換入口として同じ処理を提供します。
 - MCP tools: `list_tasks`、`create_task`、`set_task_completed`、`delete_task`。
 - API/MCP/UIは同じスキーマとデータを利用。一覧は新しい順に最大100件。
 - 完了はtoggleではなく状態設定。削除済みの再削除は成功応答で`deleted: false`。作成の再実行は別タスクを作ります。
+
+## CLIから同じツールを呼ぶ
+
+先に `npm run dev` を起動しておきます。CLIは固定のローカル `/mcp` に接続し、サーバーのツールを直接呼びます。別のDBや操作実装は持ちません。
+
+```sh
+npm run tasks -- list
+npm run tasks -- call list_tasks '{}'
+npm run tasks -- call create_task '{"title":"最初のサンプルを試す"}' --confirm
+npm run tasks -- call set_task_completed '{"id":"取得したUUID","completed":true}' --confirm
+npm run tasks -- call delete_task '{"id":"取得したUUID"}' --confirm
+```
+
+`list_tasks` 以外の呼出しは `--confirm` が必要です。これは意図的な呼出しを促すCLIのガードであり、認証や権限管理の代わりではありません。JSON結果を標準出力、エラーを標準エラーへ返し、失敗時は非ゼロ終了します。作成の結果が不明なときは一覧で確認し、盲目的に再実行しないでください。
 
 ## 品質チェック
 
@@ -60,6 +77,6 @@ npm run test:e2e
 
 同じマシンのプロセスは操作できます。localhost制限は認証の代わりではありません。公開前には認証、所有者スコープ、CSRF/MCP認可、レート制限、運用を別途実装してください。
 
-GitHubリポジトリ作成・push・Cloudflare接続・デプロイは行っていません。正式なCodexクラウド環境を作成する場合は、このリポジトリの公開先と環境設定が別途必要です。
+リポジトリは [upamune/techbookfest21-sample](https://github.com/upamune/techbookfest21-sample) です。Cloudflareへの接続・デプロイは含みません。
 
 検証結果と未実行項目は[検証記録](docs/VERIFICATION.md)を参照してください。

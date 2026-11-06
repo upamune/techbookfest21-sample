@@ -48,7 +48,9 @@ export function createApi(development: boolean) {
     const deleted = await createTaskService(context.env.DB).remove(input);
     return context.json({ deleted });
   });
-  app.all("/api/mcp", (context) => handleMcp(context.req.raw, createTaskService(context.env.DB)));
+  for (const path of ["/mcp", "/api/mcp"]) {
+    app.all(path, (context) => handleMcp(context.req.raw, createTaskService(context.env.DB)));
+  }
   app.notFound((context) => context.json({ error: "Route not found." }, 404));
   app.onError((error, context) => {
     if (error instanceof z.ZodError) return context.json({ error: "Invalid input." }, 400);

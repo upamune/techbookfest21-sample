@@ -46,8 +46,8 @@ describe("HTTP boundary before database access", () => {
     });
     expect(response.status).toBe(413);
   });
-  it("fails closed for the MCP endpoint in production", async () => {
-    const response = await createApi(false).request("http://localhost/api/mcp", { method: "POST" });
+  it.each(["/mcp", "/api/mcp"])("fails closed for %s in production", async (path) => {
+    const response = await createApi(false).request(`http://localhost${path}`, { method: "POST" });
     expect(response.status).toBe(503);
   });
   it("returns a JSON route error", async () => {

@@ -26,7 +26,8 @@
     "quality:similarity": "node scripts/run-quality-tool.mjs similarity-ts src pages routes db --exclude src/components/ui --exclude \"*.test.ts\" --threshold 0.9 --min-lines 8 --fail-on-duplicates",
     "quality:unused": "knip",
     "quality": "npm run quality:unused && npm run quality:complexity && npm run quality:similarity",
-    "ci:headless": "npm run check && npm run typecheck && npm test && npm run quality && npm run build && npm run test:integration"
+    "ci:headless": "npm run check && npm run typecheck && npm test && npm run quality && npm run build && npm run test:integration",
+    "tasks": "node scripts/tasks.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",

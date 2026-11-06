@@ -2,7 +2,24 @@
 
 2026-11-06 に Node.js 24.22.1 / npm 11.9.0 / Linux x64 で確認。
 
-## 通過
+## UI・通信回復の追加検証
+
+- 中立色のタスク作業画面へ整理。長い題名・320px幅・文字拡大・reduced motionを想定したブラウザー回帰試験を追加。
+- 10秒の通信期限を呼出し元のキャンセルと合成し、応答本文の読み込みも期限対象とする。書込みは自動再試行しない。
+- 削除確認はキャンセルへ初期フォーカスし、キャンセル後は元ボタン、削除後は入力へ戻す。入力フォーカス表示と簡潔な読み上げ通知を追加。
+- 単体テスト67件、型付きlint・型検査・品質ゲート・ビルド・実Workers/D1統合テスト5件が通過。最終ブラウザー操作検証は別途結果を記録する。
+- ソースレビューで不要コメント・正しさを抑制する指示は検出なし。
+
+## CLI・標準入口の追加検証
+
+- `/mcp` を標準入口に追加し、旧 `/api/mcp` の互換性を維持。
+- CLIは共有Zod入力と標準MCPクライアントを使用。変更系の明示確認、固定loopback、redirect拒否、10秒deadline、自動再送なし。
+- 単体テストは5ファイル61件が通過。型付きlint、strict型検査、build、Knip/cccc/similarityも通過。
+- ccccは19ファイル91関数、最大cognitive 7 / cyclomatic 10。similarityは15ファイルで設定閾値以上の重複なし。
+- 実Workers/D1統合テスト5件が通過。標準入口と互換入口、CLIとHTTPの同一データ、変更確認、MCPエラーの非ゼロ終了を確認。
+- この変更のブラウザテストはローカルでは再実行していません。初期コミットのCI成功と混同しないでください。
+
+## 初期実装の通過項目
 
 - `npm run check`: フォーマット、型付き lint が通過。
 - `npm run typecheck`: strict TypeScript が通過。
@@ -15,7 +32,11 @@
 - 実際のローカル Workers/D1 を使う API 統合テストは 3 件通過。HTTP と MCP の共有永続化、更新・削除の冪等性、入力・Origin・本番拒否、SSR を確認。
 - ソースレビューで通常のコードコメント・抑制指示は 0 件。必要な Vite コンパイラ用 triple-slash directive は保持。
 
-## ブラウザ検証は未完了
+## 初期コミットのGitHub Actions検証
+
+初期コミット `def87ea3d074bb2e2e2aaa61f635be07e4752152` は [Check #1](https://github.com/upamune/techbookfest21-sample/actions/runs/42185113553) の `npm run ci` が成功しています。ブラウザテストを含むCIの結果です。以下は初回ローカル実行時の制限の記録であり、以後の変更まで検証したという意味ではありません。
+
+## 初回ローカルのブラウザ検証制限
 
 Playwright のブラウザテスト 4 件は用意済みですが、この実行環境では Chromium が `socket() failed: Operation not permitted` で起動できず、画面操作の検証は実行できませんでした。テスト失敗をアプリの成功として扱っていません。実ブラウザでの表示、作成・再読み込み・完了・削除、通信失敗時の再試行は、ブラウザを実行できる環境で確認してください。
 
@@ -26,7 +47,7 @@ npx playwright install --with-deps chromium
 npm run ci
 ```
 
-GitHub Actions の設定は `.github/workflows/check.yml` にあります。外部リポジトリへの push や Actions 実行はしていません。
+GitHub Actions の設定は `.github/workflows/check.yml` にあります。初回ローカル検証後にリポジトリへpushされ、上記のCIが成功しています。
 
 この制限環境で API テストを実行する際は、書込み可能な設定ディレクトリと Inspector 無効化を指定しました。
 
@@ -45,4 +66,4 @@ XDG_CONFIG_HOME=/tmp/void-v2-config VOID_INSPECTOR_PORT=false npm run test:integ
 
 ## 提供範囲
 
-ローカル学習用サンプルです。認証・認可は未実装であり、本番では HTTP API と MCP を閉じる設計です。本番向けデプロイ、外部リポジトリの新設・変更、クラウド環境の新設は行っていません。
+ローカル学習用サンプルです。認証・認可は未実装であり、本番では HTTP API と MCP を閉じる設計です。本番向けデプロイは行っていません。ローカル学習用の境界を維持しています。

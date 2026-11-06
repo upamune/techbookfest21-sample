@@ -1,0 +1,5 @@
+languages = ["es"]
+max-cognitive = 15
+max-cyclomatic = 10
+exclude = ["node_modules/**", "dist/**", ".void/**", ".tools/**", "**/components/ui/**"]
+pretty = true

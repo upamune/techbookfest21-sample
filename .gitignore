@@ -1,0 +1,16 @@
+node_modules
+dist
+.void
+.wrangler
+.cloudflare
+.void-wrangler.jsonc
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+.DS_Store
+
+.tools/
+.cccc.cache
+test-results/
+playwright-report/

@@ -1,0 +1,39 @@
+{
+  "repository": "https://github.com/cursor/plugins",
+  "commit": "2776ddd2355d6d6c8747d3964600f28daf62f049",
+  "license": "MIT",
+  "files": [
+    {
+      "path": "pstack/skills/typescript-best-practices/SKILL.md",
+      "blobSha": "e1e5aa7c97ed39c425d60d933a96424a3f14539e"
+    },
+    {
+      "path": "pstack/skills/typescript-best-practices/references/patterns.md",
+      "blobSha": "f8dd99b63ecb469a090b8fa0a7e235d3239cb9ec"
+    },
+    {
+      "path": "pstack/skills/principle-type-system-discipline/SKILL.md",
+      "blobSha": "9fa08b0b17d536ce751fffa90134be8fb03699c7"
+    },
+    {
+      "path": "pstack/skills/principle-boundary-discipline/SKILL.md",
+      "blobSha": "dfe9a6fb0e5acd6ae43a41437ee0951adfe839cb"
+    },
+    {
+      "path": "pstack/skills/principle-encode-lessons-in-structure/SKILL.md",
+      "blobSha": "4a96f77fe70e36cb030f9c5efa142f66877bf58a"
+    },
+    {
+      "path": "pstack/skills/no-comments/SKILL.md",
+      "blobSha": "a07ce9dfc657bdf1b2bdf3f7619225e7faac091b"
+    },
+    {
+      "path": "pstack/agents/comment-sicko.md",
+      "blobSha": "209e3704dfa75022060c936bd3f3362fa3bbe254"
+    },
+    {
+      "path": "pstack/LICENSE",
+      "blobSha": "6b5400237fdf6545be0b8fae370d6f2fcff8fb25"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "tools": [
+    {
+      "name": "cccc",
+      "version": "1.8.6",
+      "repository": "https://github.com/moznion/cccc",
+      "assets": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "url": "https://github.com/moznion/cccc/releases/download/v1.8.6/cccc-v1.8.6-aarch64-apple-darwin.tar.gz",
+          "sha256": "e34d6bc3e41cb945927dadd09a7573b00c61707ed9c180a5a7b31e2ee127b296"
+        },
+        {
+          "platform": "linux",
+          "arch": "arm64",
+          "url": "https://github.com/moznion/cccc/releases/download/v1.8.6/cccc-v1.8.6-aarch64-unknown-linux-musl.tar.gz",
+          "sha256": "12e8ec6268d70ebb77b22f445c969bfe9ca3476853b29e6aa4029bfcb062d526"
+        },
+        {
+          "platform": "darwin",
+          "arch": "x64",
+          "url": "https://github.com/moznion/cccc/releases/download/v1.8.6/cccc-v1.8.6-x86_64-apple-darwin.tar.gz",
+          "sha256": "ff4a8937133f524e9f0e4e261d312fbd207aaf73c4e00bde8abe280af63632de"
+        },
+        {
+          "platform": "linux",
+          "arch": "x64",
+          "url": "https://github.com/moznion/cccc/releases/download/v1.8.6/cccc-v1.8.6-x86_64-unknown-linux-musl.tar.gz",
+          "sha256": "7f31cf0aba7694baa05b7a2e5f4a50af3308d02a3df0dc9778e828b7116aa968"
+        }
+      ]
+    },
+    {
+      "name": "similarity-ts",
+      "version": "0.5.0",
+      "repository": "https://github.com/mizchi/similarity",
+      "assets": [
+        {
+          "platform": "darwin",
+          "arch": "arm64",
+          "url": "https://github.com/mizchi/similarity/releases/download/v0.5.0/similarity-v0.5.0-aarch64-apple-darwin.tar.gz",
+          "sha256": "d5a6abcf915b87061857c23a1934883a99b93970a66c627cc8b7f3286c0ba916"
+        },
+        {
+          "platform": "linux",
+          "arch": "x64",
+          "url": "https://github.com/mizchi/similarity/releases/download/v0.5.0/similarity-v0.5.0-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "2afda6201b6afb1ee36c1ce51b95a538ec99310c79f661905536d917470a406a"
+        }
+      ]
+    }
+  ]
+}

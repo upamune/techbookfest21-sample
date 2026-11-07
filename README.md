@@ -1,6 +1,8 @@
 # Void Task Lab
 
-技術書の構成検証用に、一から組み直したローカル専用サンプルです。タスクCRUDは仮題材で、書籍の最終題材ではありません。
+技術書の構成検証用サンプルです。タスクCRUDは仮題材で、書籍の最終題材ではありません。
+
+ローカル実行に加え、認証付きWeb・API・MCP・CLIの公開準備を実装しています。公開先はまだありません。本番アクセスは既定で無効です。Cloudflare資源作成・認証設定・公開は別途確認してから行います。[公開準備と境界](docs/DEPLOYMENT.md)を参照してください。
 
 Void / React / Hono / Cloudflare D1 / 標準Drizzle / Tailwind CSS v4 / shadcn Base UI / 標準MCPを使用します。pstackのTypeScript best practices・no-commentsと、cccc・similarity-ts・Knipを導入しています。
 
@@ -30,7 +32,7 @@ http://127.0.0.1:5273 を開きます。初回起動でローカルD1へmigratio
 
 ## CLIから同じツールを呼ぶ
 
-先に `npm run dev` を起動しておきます。CLIは固定のローカル `/mcp` に接続し、サーバーのツールを直接呼びます。別のDBや操作実装は持ちません。
+先に `npm run dev` を起動しておきます。CLIは既定でローカル `/mcp` に接続し、サーバーのツールを直接呼びます。別のDBや操作実装は持ちません。公開後は明示したHTTPSエンドポイントとトークンを使用できます。
 
 ```sh
 npm run tasks -- list
@@ -64,7 +66,7 @@ npm run test:e2e
 - `src/tasks/`: Zod contractsとDrizzle service
 - `src/http/`: Hono API
 - `src/mcp/`: 公式SDKのstateless Streamable HTTP
-- `src/security/`: local-only制約と実バイト数による本文制限
+- `src/security/`: 認証境界、トークン管理と実バイト数による本文制限
 - `src/client/`: 応答検証とUI操作状態
 - `pages/`: React画面、Tailwindテーマ
 - `db/`: D1 schemaとmigration
@@ -73,9 +75,9 @@ npm run test:e2e
 
 ## 公開しないための境界
 
-認証・ユーザー別認可・MCP OAuthは未実装です。開発ビルドかつloopbackからだけAPI/MCPを受け付け、本番ビルドは503で拒否します。異なるOriginやcross-site要求は拒否し、本文上限8KiB・入力スキーマ・DB制約・パラメータ化SQLで検証します。
+開発ビルドはloopbackからだけAPI/MCPを受け付けます。本番は認証の有効化が既定で停止しており503で拒否します。有効化後はセッションまたは失効可能なBearerトークンが必要で、全操作をユーザー別に分離します。MCP OAuth discoveryは提供せず、手動設定したBearerヘッダーで接続します。異なるOriginやcross-site要求は拒否し、本文上限8KiB・入力スキーマ・DB制約・パラメータ化SQLで検証します。
 
-同じマシンのプロセスは操作できます。localhost制限は認証の代わりではありません。公開前には認証、所有者スコープ、CSRF/MCP認可、レート制限、運用を別途実装してください。
+同じマシンのプロセスはローカルデータを操作できます。localhost制限は認証の代わりではありません。公開前には認証設定・レート制限・バックアップなど運用を確認してください。本番のログインと公開URLでの動作は未検証です。
 
 リポジトリは [upamune/techbookfest21-sample](https://github.com/upamune/techbookfest21-sample) です。Cloudflareへの接続・デプロイは含みません。
 

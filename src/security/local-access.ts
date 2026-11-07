@@ -1,9 +1,13 @@
 const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-export function localAccessError(request: Request, development: boolean): string | null {
-  if (!development) return "API access is disabled outside local development.";
+export function localAccessError(
+  request: Request,
+  development: boolean,
+  authenticated = false,
+): string | null {
+  if (!development && !authenticated) return "API access is disabled outside local development.";
   const url = new URL(request.url);
-  if (!loopbackHosts.has(url.hostname)) return "Only loopback access is allowed.";
+  if (development && !loopbackHosts.has(url.hostname)) return "Only loopback access is allowed.";
   const origin = request.headers.get("origin");
   if (origin !== null && origin !== url.origin) return "Cross-origin requests are forbidden.";
   if (request.headers.get("sec-fetch-site") === "cross-site")

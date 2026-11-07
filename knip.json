@@ -4,6 +4,8 @@
     "pages/**/*.{ts,tsx}",
     "routes/**/*.ts",
     "void.config.ts",
+    "auth.ts",
+    "env.ts",
     "scripts/*.{mjs,ts}",
     "tests/**/*.ts",
     "db/schema.ts"

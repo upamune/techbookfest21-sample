@@ -16,14 +16,15 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "npm run dev",
-      url: "http://127.0.0.1:5273",
+      command: "node scripts/preview-test.mjs",
+      url: "http://127.0.0.1:4273",
       timeout: 120000,
       reuseExistingServer: false,
+      gracefulShutdown: { signal: "SIGTERM", timeout: 5000 },
     },
     {
-      command: "npm run preview",
-      url: "http://127.0.0.1:4273",
+      command: "npm run dev",
+      url: "http://127.0.0.1:5273",
       timeout: 120000,
       reuseExistingServer: false,
     },

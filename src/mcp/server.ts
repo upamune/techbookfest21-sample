@@ -27,7 +27,8 @@ function createMcpServer(service: TaskService) {
   server.registerTool(
     "create_task",
     {
-      description: "Create one local task. Repeating a call creates another task.",
+      description:
+        "Create one task for the authenticated owner. Repeating a call creates another task.",
       inputSchema: createTaskInput,
       annotations: {
         readOnlyHint: false,

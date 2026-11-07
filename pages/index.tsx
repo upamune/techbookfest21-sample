@@ -11,11 +11,24 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { AuthGate } from "@/client/auth-gate";
 import { useTasks } from "@/client/use-tasks";
 import type { Task } from "@/tasks/contracts";
 import "./style.css";
 
 export default function HomePage() {
+  return import.meta.env.DEV ? (
+    <TaskWorkspace />
+  ) : (
+    <AuthGate>
+      <TaskWorkspace />
+    </AuthGate>
+  );
+}
+
+const environmentLabel = import.meta.env.DEV ? "ローカル開発用" : "プライベートワークスペース";
+
+function TaskWorkspace() {
   const model = useTasks();
   const inputRef = useRef<HTMLInputElement>(null);
   const deleteTriggerRef = useRef<HTMLButtonElement>(null);
@@ -41,7 +54,7 @@ export default function HomePage() {
             Void <span className="brand-divider">/</span> Task Lab
           </span>
         </div>
-        <span className="environment-label">ローカル開発用</span>
+        <span className="environment-label">{environmentLabel}</span>
       </header>
       <main className="workspace">
         <section aria-label="タスク管理">
@@ -129,7 +142,7 @@ export default function HomePage() {
                 同じマシンのクライアントから /mcp に接続。標準のStreamable
                 HTTPで4つの操作を利用できます。
               </p>
-              <p>認証は未実装です。本番ビルドではAPI・MCPを無効化しています。</p>
+              <p>本番アクセスは認証と管理者による有効化が必要です。</p>
             </div>
           </details>
         </aside>

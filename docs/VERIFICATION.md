@@ -1,5 +1,16 @@
 # 検証結果
 
+## 2026-11-07 認証付き公開準備
+
+- check / typecheck / unit 123件 / build / Knip / cccc / similarity-ts 成功。
+- 実Miniflare/D1に全migrationを適用し、所有者間の一覧・変更・削除分離と、token失効・期限切れ・アカウント削除・有効100件上限を確認。
+- ローカル実Workers/D1/API/MCP/CLIの統合テスト5件成功。
+- ブラウザ8件は、このexecutorのChromiumが `socket() failed: Operation not permitted` で起動不可。成功扱いにせずGitHub CIで確認する。
+- Playwrightのpreviewは既存 `.env` のない専用checkoutで実行する。テスト用認証secretを一時生成し、終了時に消去する。実アカウントや本番credentialsは使用しない。
+- GitHub・Google OAuthの実ログイン、Cloudflare資源作成、本番公開URLは未実施。以前のlocal-only記録は以下に履歴として残す。
+
+## 以前の検証
+
 2026-11-06 に Node.js 24.22.1 / npm 11.9.0 / Linux x64 で確認。
 
 ## UI・通信回復の追加検証

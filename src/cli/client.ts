@@ -1,10 +1,13 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Command } from "./arguments.ts";
+import { parseConnection } from "./connection.ts";
 
-export async function executeCommand(command: Command) {
+export async function executeCommand(command: Command, environment: unknown = process.env) {
   const deadline = AbortSignal.timeout(10_000);
-  const transport = new StreamableHTTPClientTransport(new URL("http://127.0.0.1:5273/mcp"), {
+  const connection = parseConnection(environment);
+  const transport = new StreamableHTTPClientTransport(connection.url, {
+    requestInit: { headers: connection.headers },
     fetch: (input, init) =>
       fetch(input, {
         ...init,

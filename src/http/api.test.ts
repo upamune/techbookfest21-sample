@@ -56,3 +56,55 @@ describe("HTTP boundary before database access", () => {
     expect(await response.json()).toEqual({ error: "Route not found." });
   });
 });
+
+describe("authenticated production boundary", () => {
+  it("does not let bearer principals issue more credentials", async () => {
+    const response = await createApi(false).request(
+      "https://tasks.example/api/tokens",
+      {
+        method: "POST",
+        headers: { origin: "https://tasks.example", "content-type": "application/json" },
+        body: '{"name":"forbidden"}',
+      },
+      { TASK_AUTH_ENABLED: true, TASK_OWNER: "user:test" },
+    );
+    expect(response.status).toBe(401);
+  });
+  it("requires explicit same-origin token management", async () => {
+    const response = await createApi(false).request(
+      "https://tasks.example/api/tokens",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: '{"name":"forbidden"}',
+      },
+      { TASK_AUTH_ENABLED: true, TASK_OWNER: "user:test", SESSION_OWNER: "user:test" },
+    );
+    expect(response.status).toBe(403);
+  });
+  it("rejects anonymous access when explicitly enabled", async () => {
+    const response = await createApi(false).request(endpoint, {}, { TASK_AUTH_ENABLED: true });
+    expect(response.status).toBe(401);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+  it("does not trust client-supplied owner headers", async () => {
+    const response = await createApi(false).request(
+      endpoint,
+      { headers: { TASK_OWNER: "user:victim", "x-user-id": "victim" } },
+      { TASK_AUTH_ENABLED: true },
+    );
+    expect(response.status).toBe(401);
+  });
+  it("rejects cross-origin authenticated requests", async () => {
+    const response = await createApi(false).request(
+      endpoint,
+      { headers: { origin: "https://evil.example" } },
+      { TASK_AUTH_ENABLED: true, TASK_OWNER: "user:test" },
+    );
+    expect(response.status).toBe(403);
+  });
+  it("does not accept an authenticated principal while the gate is off", async () => {
+    const response = await createApi(false).request(endpoint, {}, { TASK_OWNER: "user:test" });
+    expect(response.status).toBe(503);
+  });
+});

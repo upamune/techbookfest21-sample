@@ -16,5 +16,15 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src", "pages", "routes", "db", "tests", "*.ts", "scripts/**/*.ts"]
+  "include": [
+    "src",
+    "apps",
+    "packages",
+    "pages",
+    "routes",
+    "db",
+    "tests",
+    "*.ts",
+    "scripts/**/*.ts"
+  ]
 }

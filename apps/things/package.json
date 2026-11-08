@@ -1,0 +1,20 @@
+{
+  "name": "@pocket/things",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./manifest": "./src/manifest.ts",
+    "./server": "./src/server.ts",
+    "./contracts": "./src/contracts.ts",
+    "./items-page": "./src/items-page.tsx"
+  },
+  "dependencies": {
+    "@pocket/tools": "*",
+    "@pocket/ui": "*",
+    "drizzle-orm": "0.45.4",
+    "lucide-react": "1.69.0",
+    "react": "^19.2.4",
+    "zod": "^4.6.7"
+  }
+}

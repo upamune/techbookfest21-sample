@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { Command } from "./arguments.ts";
+import { assertCallAllowed, type Command } from "./arguments.ts";
 import { parseConnection } from "./connection.ts";
 
 export async function executeCommand(command: Command, environment: unknown = process.env) {
@@ -21,13 +21,21 @@ export async function executeCommand(command: Command, environment: unknown = pr
       reconnectionDelayGrowFactor: 1,
     },
   });
-  const client = new Client({ name: "void-task-cli", version: "0.2.0" });
+  const client = new Client({ name: "pocket-cli", version: "0.3.0" });
   const requestOptions = { timeout: 10_000, maxTotalTimeout: 10_000, signal: deadline };
   try {
     await client.connect(transport, requestOptions);
     if (command.kind === "list") {
       return await client.listTools(undefined, requestOptions);
     }
+    const { tools } = await client.listTools(undefined, requestOptions);
+    const target = tools.find((tool) => tool.name === command.name);
+    if (target === undefined) throw new Error(`Unknown tool: ${command.name}`);
+    assertCallAllowed({
+      name: command.name,
+      readOnly: target.annotations?.readOnlyHint,
+      confirmed: command.confirmed,
+    });
     const result = await client.callTool(
       { name: command.name, arguments: command.arguments },
       undefined,

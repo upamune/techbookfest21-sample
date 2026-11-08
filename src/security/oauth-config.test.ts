@@ -6,23 +6,23 @@ function options(env: Parameters<typeof configureAuth>[0]["env"]) {
     defaults: { emailAndPassword: { enabled: true } },
     env,
     dialect: "sqlite",
-    request: new Request("https://tasks.example"),
+    request: new Request("https://pocket.example"),
   });
 }
 
 describe("GitHub OAuth configuration", () => {
   it.each([
     {},
-    { TASK_AUTH_ENABLED: true },
-    { TASK_AUTH_ENABLED: true, AUTH_GITHUB_CLIENT_ID: "test-client" },
-    { TASK_AUTH_ENABLED: true, AUTH_GITHUB_CLIENT_SECRET: "test-fixture" },
+    { POCKET_AUTH_ENABLED: true },
+    { POCKET_AUTH_ENABLED: true, AUTH_GITHUB_CLIENT_ID: "test-client" },
+    { POCKET_AUTH_ENABLED: true, AUTH_GITHUB_CLIENT_SECRET: "test-fixture" },
     {
-      TASK_AUTH_ENABLED: true,
+      POCKET_AUTH_ENABLED: true,
       AUTH_GITHUB_CLIENT_ID: " ",
       AUTH_GITHUB_CLIENT_SECRET: "test-fixture",
     },
     {
-      TASK_AUTH_ENABLED: false,
+      POCKET_AUTH_ENABLED: false,
       AUTH_GITHUB_CLIENT_ID: "test-client",
       AUTH_GITHUB_CLIENT_SECRET: "test-fixture",
     },
@@ -32,7 +32,7 @@ describe("GitHub OAuth configuration", () => {
   });
   it.each([true, "true"])("enables GitHub only with complete configuration (%s)", (enabled) => {
     const configuration = options({
-      TASK_AUTH_ENABLED: enabled,
+      POCKET_AUTH_ENABLED: enabled,
       AUTH_GITHUB_CLIENT_ID: "test-client",
       AUTH_GITHUB_CLIENT_SECRET: "test-fixture",
     });

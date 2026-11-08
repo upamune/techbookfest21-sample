@@ -12,7 +12,7 @@ export async function boundedRequest(request: Request, maxBytes: number): Promis
       size += chunk.value.byteLength;
       if (size > maxBytes) {
         await reader.cancel();
-        throw new HTTPException(413, { message: "Request body exceeds 8 KiB." });
+        throw new HTTPException(413, { message: "Request body is too large." });
       }
       chunks.push(chunk.value);
     }

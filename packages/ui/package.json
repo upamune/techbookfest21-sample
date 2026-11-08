@@ -1,0 +1,23 @@
+{
+  "name": "@pocket/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./button": "./src/primitives/button.tsx",
+    "./input": "./src/primitives/input.tsx",
+    "./textarea": "./src/primitives/textarea.tsx",
+    "./skeleton": "./src/primitives/skeleton.tsx",
+    "./sheet": "./src/primitives/sheet.tsx",
+    "./app-bar": "./src/app-bar.tsx",
+    "./feedback": "./src/feedback.tsx",
+    "./format": "./src/format.ts",
+    "./use-keyboard-inset": "./src/use-keyboard-inset.ts"
+  },
+  "dependencies": {
+    "@base-ui/react": "1.9.0",
+    "class-variance-authority": "0.7.1",
+    "cn": "0.5.2",
+    "react": "^19.2.4"
+  }
+}

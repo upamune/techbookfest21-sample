@@ -37,9 +37,9 @@ describe("GitHub allowlist", () => {
   it("checks account creation independently and disables implicit linking", async () => {
     const configuration = configureAuth({
       defaults: {},
-      env: { TASK_ALLOWED_GITHUB_IDS: '["42"]' },
+      env: { POCKET_ALLOWED_GITHUB_IDS: '["42"]' },
       dialect: "sqlite",
-      request: new Request("https://tasks.example"),
+      request: new Request("https://pocket.example"),
     });
     const account = {
       id: "test",

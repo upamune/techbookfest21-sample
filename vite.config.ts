@@ -31,5 +31,12 @@ export default defineConfig(({ mode }) => ({
       ".agents/**",
     ],
   },
-  test: { include: ["src/**/*.test.ts", "tests/cli*.test.ts"] },
+  test: {
+    include: [
+      "src/**/*.test.ts",
+      "apps/**/*.test.ts",
+      "packages/**/*.test.ts",
+      "tests/cli*.test.ts",
+    ],
+  },
 }));

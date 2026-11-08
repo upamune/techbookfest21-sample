@@ -3,7 +3,7 @@ import { readFile, unlink, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 
-const fixture = `BETTER_AUTH_SECRET=${randomBytes(32).toString("hex")}\nTASK_AUTH_ENABLED=false\n`;
+const fixture = `BETTER_AUTH_SECRET=${randomBytes(32).toString("hex")}\nPOCKET_AUTH_ENABLED=false\n`;
 await writeFile(".env", fixture, { flag: "wx", mode: 0o600 });
 const child = spawn("npm", ["run", "preview"], { stdio: "inherit", env: process.env });
 const stop = () => child.kill("SIGTERM");

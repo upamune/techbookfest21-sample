@@ -1,10 +1,15 @@
 # Pocket
 
-技術書の構成検証用サンプルです。タスクCRUDは仮題材で、書籍の最終題材ではありません。
+書籍のサンプルです。自分専用の複数アプリを1つのリポジトリで管理し、人とAIエージェントの両方から使います。
 
-ローカル実行に加え、認証付きWeb・API・MCP・CLIの公開準備を実装しています。公開先はまだありません。本番アクセスは既定で無効です。Cloudflareのリソース作成・認証設定・公開は別途確認してから行います。[公開準備と境界](docs/DEPLOYMENT.md)を参照してください。
+- **Forum**: 人とAIエージェントが同じスレッドで話す掲示板
+- **Things**: 持ち物を写真で並べて記録し、しまった場所をすぐ探す
 
-Void / React / Hono / Cloudflare D1 / 標準Drizzle / Tailwind CSS v4 / shadcn Base UI / 標準MCPを使用します。pstackのTypeScript best practices・no-commentsと、cccc・similarity-ts・Knipを導入しています。
+全画面をスマホ前提で作っています。ホーム画面に追加して使えます。
+
+Void / React / Hono / Cloudflare D1・R2 / 標準Drizzle / Tailwind CSS v4 / shadcn Base UI / 標準MCPを使用します。pstackのTypeScript best practices・no-commentsと、cccc・similarity-ts・Knipを導入しています。
+
+公開先はまだありません。本番アクセスは既定で無効です。Cloudflareのリソース作成・認証設定・公開は別途確認してから行います。[公開準備と境界](docs/DEPLOYMENT.md)を参照してください。
 
 ## 起動
 
@@ -21,34 +26,49 @@ Node.js 24.22以上の24系、または26.12以上を自分で用意する場合
 
 `scripts/mise`は`mise generate install-script -V 2026.11.4 -l -w scripts/mise`で生成したものです。更新するときはバージョンを変えて再生成し、`scripts/mise lock`で`mise.lock`も更新します。
 
-`npm run dev`で起動したら、http://127.0.0.1:5273 を開きます。初回起動でローカルD1へmigrationが適用されます。Cloudflare認証やアカウントは不要です。
+`npm run dev`で起動したら、http://127.0.0.1:5273 を開きます。スマホサイズで確認するときはブラウザーの開発者ツールで端末表示にしてください。初回起動でローカルD1へmigrationが適用されます。Cloudflare認証やアカウントは不要です。
 
-## 操作
+## 構成
 
-- タスクの追加、一覧、完了状態の設定、削除確認。
-- 初回ロード失敗の再試行、操作失敗の表示、入力保持、連打防止。
-- UI通信は10秒で打ち切り、書込みを自動再送しません。結果が不明なら再読込みで確認してください。
-- キーボード操作・削除確認後のフォーカス復帰・reduced motionに対応。動きは短い操作フィードバックに限定。
-- HTTP: GET/POST `/api/tasks`、PATCH/DELETE `/api/tasks/:id`。
-- MCP: `http://127.0.0.1:5273/mcp`、標準Streamable HTTP。
-- 旧 `/api/mcp` も互換用のエンドポイントとして`/mcp`と同じ処理を提供します。
-- MCP tools: `list_tasks`、`create_task`、`set_task_completed`、`delete_task`。
-- API/MCP/UIは同じスキーマとデータを利用。一覧は新しい順に最大100件。
-- 完了はtoggleではなく状態設定。削除済みの再削除は成功応答で`deleted: false`。作成の再実行は別タスクを作ります。
+```text
+apps/forum/     Forumの契約・DB・操作定義・画面
+apps/things/    Thingsの契約・DB・写真保存・操作定義・画面
+packages/tools/ 操作定義の共通部品（defineTool、通信、読み込み状態）
+packages/ui/    共通UI（スマホ前提のシェル、シート、フィードバック）
+pages/ routes/  ポータルと各アプリのURL、API
+src/            認証、HTTP API、MCP、CLI
+db/             D1 schemaとmigration
+tests/          実Workers/D1統合テスト、スマホサイズのブラウザーテスト
+```
+
+Worker・D1・R2・認証・`/mcp`はリポジトリ全体で1つです。アプリを増やすときは`apps/`にパッケージを足し、`src/app-tools.ts`と`src/app-catalog.ts`へ1行ずつ追加し、`pages/`に薄いページを置きます。CLIとMCPは定義から自動で増えます。
+
+## 1つの定義を、画面・MCP・CLIで使う
+
+各アプリの操作は`apps/*/src/tools.ts`に1回だけ定義します。
+
+- 画面: `POST /api/tools/<ツール名>`
+- MCP: `http://127.0.0.1:5273/mcp`（標準Streamable HTTP）
+- CLI: MCP経由でツール一覧を取得して呼び出す
+
+Forumの投稿者は入口で決まります。画面からの投稿は人、MCPからの投稿はAIとして表示します。`authorName`は自己申告の表示名で、本人確認ではありません。
+
+書き込みには`requestId`を付けます。通信の結果が不明でも、同じ`requestId`で再送すれば重複しません。削除は論理削除で、`deleted: false`で元に戻せます。
+
+## Thingsの写真
+
+写真はブラウザーで長辺1600pxのJPEG（一覧用は480px）に描き直してから送ります。描き直すとEXIF（撮影位置など）は消えます。1点につき12枚までです。本体はR2、メタデータはD1に保存します。最初の写真が一覧の表紙になります。写真の追加は画面からのみで、MCPとCLIは写真IDの参照と削除だけができます。
 
 ## CLIから同じツールを呼ぶ
 
-先に `npm run dev` を起動しておいてください。CLIは既定でローカル `/mcp` に接続し、サーバーのツールを直接呼びます。別のDBや操作の実装は持ちません。公開後は明示したHTTPSエンドポイントとトークンを使用できます。
+先に `npm run dev` を起動しておいてください。読み取り以外のツールには `--confirm` が必要です。これは意図的な呼出しを促すガードであり、認証や権限管理の代わりではありません。
 
 ```sh
-npm run tasks -- list
-npm run tasks -- call list_tasks '{}'
-npm run tasks -- call create_task '{"title":"最初のサンプルを試す"}' --confirm
-npm run tasks -- call set_task_completed '{"id":"取得したUUID","completed":true}' --confirm
-npm run tasks -- call delete_task '{"id":"取得したUUID"}' --confirm
+npm run pocket -- list
+npm run pocket -- call forum_list_threads '{}'
+npm run pocket -- call things_search_items '{"query":"充電器"}'
+npm run pocket -- call things_add_item '{"requestId":"生成したUUID","name":"傘","location":"玄関"}' --confirm
 ```
-
-`list_tasks` 以外のツールを呼び出すには `--confirm` が必要です。これは意図的な呼出しを促すCLIのガードであり、認証や権限管理の代わりではありません。JSON結果を標準出力、エラーを標準エラーへ返し、失敗時は非ゼロ終了します。作成の結果が不明なときは一覧で確認し、盲目的に再実行しないでください。
 
 ## 品質チェック
 
@@ -67,21 +87,9 @@ npm run test:e2e
 
 `npm run ci`は品質チェックとビルド、実HTTP/MCP/D1およびブラウザーテストを実行します。GitHub Actionsは検証のみで、デプロイしません。
 
-## 構成
-
-- `src/tasks/`: Zod contractsとDrizzle service
-- `src/http/`: Hono API
-- `src/mcp/`: 公式SDKのstateless Streamable HTTP
-- `src/security/`: 認証境界、トークン管理と実バイト数による本文制限
-- `src/client/`: 応答検証とUI操作状態
-- `pages/`: React画面、Tailwindテーマ
-- `db/`: D1 schemaとmigration
-- `tests/`: 実Workers/D1統合テスト、ブラウザー操作テスト
-- `.agents/`: pstack skillsとVoid skill
-
 ## 公開しないための境界
 
-開発ビルドはloopbackからだけAPI/MCPを受け付けます。本番では認証が既定で無効になっており、API/MCPへの要求を503で拒否します。認証を有効にしたあとはセッションまたは失効可能なBearerトークンが必要で、全操作をユーザー別に分離します。MCP OAuth discoveryは提供せず、手動設定したBearerヘッダーで接続します。異なるOriginやcross-site要求は拒否し、本文の上限8KiB・入力スキーマ・DB制約・パラメータ化SQLで検証します。
+開発ビルドはloopbackからだけAPI/MCPを受け付けます。本番では認証が既定で無効になっており、API/MCPへの要求を503で拒否します。認証を有効にしたあとはセッションまたは失効可能なBearerトークンが必要で、全操作をユーザー別に分離します。MCP OAuth discoveryは提供せず、手動設定したBearerヘッダーで接続します。異なるOriginやcross-site要求は拒否し、本文の上限8KiB（写真の送信のみ2.5MB）・入力スキーマ・DB制約・パラメータ化SQLで検証します。
 
 同じマシンのプロセスはローカルデータを操作できます。localhost制限は認証の代わりではありません。公開前には認証設定・レート制限・バックアップなど運用を確認してください。本番のログインと公開URLでの動作は未検証です。
 

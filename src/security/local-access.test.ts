@@ -3,15 +3,21 @@ import { localAccessError } from "./local-access";
 
 describe("local development boundary", () => {
   it("denies production even with a loopback host", () => {
-    expect(localAccessError(new Request("http://localhost/api/tasks"), false)).not.toBeNull();
+    expect(
+      localAccessError(new Request("http://localhost/api/tools/forum_list_threads"), false),
+    ).not.toBeNull();
   });
   it.each(["localhost", "127.0.0.1", "[::1]"])("permits local clients at %s", (host) => {
-    expect(localAccessError(new Request(`http://${host}/api/tasks`), true)).toBeNull();
+    expect(
+      localAccessError(new Request(`http://${host}/api/tools/forum_list_threads`), true),
+    ).toBeNull();
   });
   it.each(["example.com", "localhost.example.com", "127.0.0.1.example.com"])(
     "denies non-loopback host %s",
     (host) => {
-      expect(localAccessError(new Request(`http://${host}/api/tasks`), true)).not.toBeNull();
+      expect(
+        localAccessError(new Request(`http://${host}/api/tools/forum_list_threads`), true),
+      ).not.toBeNull();
     },
   );
   it.each(["https://attacker.example", "null", "http://localhost:4000"])(
@@ -19,7 +25,9 @@ describe("local development boundary", () => {
     (origin) => {
       expect(
         localAccessError(
-          new Request("http://localhost:5173/api/tasks", { headers: { origin } }),
+          new Request("http://localhost:5173/api/tools/forum_list_threads", {
+            headers: { origin },
+          }),
           true,
         ),
       ).not.toBeNull();
@@ -28,7 +36,7 @@ describe("local development boundary", () => {
   it("permits exact same origin", () => {
     expect(
       localAccessError(
-        new Request("http://localhost:5173/api/tasks", {
+        new Request("http://localhost:5173/api/tools/forum_list_threads", {
           headers: { origin: "http://localhost:5173" },
         }),
         true,
@@ -38,7 +46,9 @@ describe("local development boundary", () => {
   it("denies cross-site metadata even without Origin", () => {
     expect(
       localAccessError(
-        new Request("http://localhost/api/tasks", { headers: { "sec-fetch-site": "cross-site" } }),
+        new Request("http://localhost/api/tools/forum_list_threads", {
+          headers: { "sec-fetch-site": "cross-site" },
+        }),
         true,
       ),
     ).not.toBeNull();

@@ -1,0 +1,16 @@
+{
+  "name": "@pocket/tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./define-tool": "./src/define-tool.ts",
+    "./request": "./src/request.ts",
+    "./use-tool-query": "./src/use-tool-query.ts",
+    "./use-mutation": "./src/use-mutation.ts"
+  },
+  "dependencies": {
+    "react": "^19.2.4",
+    "zod": "^4.6.7"
+  }
+}

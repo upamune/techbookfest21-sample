@@ -1,13 +1,17 @@
 {
-  "name": "void-book-sample-v2",
-  "version": "0.2.0",
+  "name": "pocket",
+  "version": "0.3.0",
   "private": true,
-  "description": "Local Void task sample with pstack and reproducible quality gates",
+  "description": "Monorepo of personal apps for people and AI agents, built on Void",
   "license": "UNLICENSED",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vp dev --host 127.0.0.1",
-    "build": "vp build",
+    "build": "vp build .",
     "preview": "vp preview --host 127.0.0.1",
     "postinstall": "void prepare",
     "check": "void prepare && vp check",
@@ -22,18 +26,19 @@
     "db:migrate": "void db migrate",
     "ci": "npm run check && npm run typecheck && npm test && npm run quality && npm run build && npm run test:e2e",
     "tools:setup": "node scripts/setup-quality-tools.mjs",
-    "quality:complexity": "node scripts/run-quality-tool.mjs cccc src pages routes db --config cccc.toml",
-    "quality:similarity": "node scripts/run-quality-tool.mjs similarity-ts src pages routes db --exclude src/components/ui --exclude \"*.test.ts\" --threshold 0.9 --min-lines 8 --fail-on-duplicates",
+    "quality:complexity": "node scripts/run-quality-tool.mjs cccc src pages routes db apps packages --config cccc.toml",
+    "quality:similarity": "node scripts/run-quality-tool.mjs similarity-ts src pages routes db apps packages --exclude packages/ui/src/primitives --exclude \"*.test.ts\" --exclude node_modules --threshold 0.9 --min-lines 8 --fail-on-duplicates",
     "quality:unused": "knip",
     "quality": "npm run quality:unused && npm run quality:complexity && npm run quality:similarity",
     "ci:headless": "npm run check && npm run typecheck && npm test && npm run quality && npm run build && npm run test:integration",
-    "tasks": "node scripts/tasks.ts"
+    "pocket": "node scripts/pocket.ts"
   },
   "dependencies": {
-    "@base-ui/react": "1.9.0",
     "@modelcontextprotocol/sdk": "1.32.2",
-    "class-variance-authority": "0.7.1",
-    "cn": "0.5.2",
+    "@pocket/forum": "*",
+    "@pocket/things": "*",
+    "@pocket/tools": "*",
+    "@pocket/ui": "*",
     "drizzle-orm": "0.45.4",
     "hono": "^4.11.9",
     "lucide-react": "1.69.0",

@@ -12,7 +12,16 @@ export default defineConfig({
   },
   projects: [
     { name: "api", testMatch: "**/api.spec.ts" },
-    { name: "browser", testMatch: "**/browser.spec.ts" },
+    {
+      name: "browser",
+      testMatch: "**/browser.spec.ts",
+      use: {
+        viewport: { width: 390, height: 844 },
+        deviceScaleFactor: 3,
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
   ],
   webServer: [
     {

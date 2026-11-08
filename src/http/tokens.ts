@@ -5,7 +5,7 @@ import type { Bindings } from "./api";
 
 export function registerTokenRoutes(app: Hono<{ Bindings: Bindings }>) {
   app.use("/api/tokens/*", async (context, next) => {
-    if (context.env?.TASK_AUTH_ENABLED !== true || !context.env.SESSION_OWNER)
+    if (context.env?.POCKET_AUTH_ENABLED !== true || !context.env.SESSION_OWNER)
       return context.json({ error: "A browser sign-in is required to manage tokens." }, 401);
     if (
       context.req.method !== "GET" &&

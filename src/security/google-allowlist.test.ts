@@ -11,7 +11,7 @@ function options(env: Parameters<typeof configureAuth>[0]["env"]) {
     defaults: {},
     env,
     dialect: "sqlite",
-    request: new Request("https://tasks.example"),
+    request: new Request("https://pocket.example"),
   });
 }
 
@@ -44,7 +44,7 @@ describe("Google immutable subject allowlist", () => {
   });
   it("keeps Google disabled if settings are incomplete or gate is closed", () => {
     expect(
-      options({ TASK_AUTH_ENABLED: true, AUTH_GOOGLE_CLIENT_ID: "test" }).socialProviders,
+      options({ POCKET_AUTH_ENABLED: true, AUTH_GOOGLE_CLIENT_ID: "test" }).socialProviders,
     ).toEqual({});
     expect(
       options({ AUTH_GOOGLE_CLIENT_ID: "test", AUTH_GOOGLE_CLIENT_SECRET: "fixture" })
@@ -53,12 +53,12 @@ describe("Google immutable subject allowlist", () => {
   });
   it("enables both providers independently without extra scopes", async () => {
     const configured = options({
-      TASK_AUTH_ENABLED: true,
+      POCKET_AUTH_ENABLED: true,
       AUTH_GOOGLE_CLIENT_ID: "test-google",
       AUTH_GOOGLE_CLIENT_SECRET: "fixture",
       AUTH_GITHUB_CLIENT_ID: "test-github",
       AUTH_GITHUB_CLIENT_SECRET: "fixture",
-      TASK_ALLOWED_GOOGLE_SUBS: '["42"]',
+      POCKET_ALLOWED_GOOGLE_SUBS: '["42"]',
     });
     expect(Object.keys(configured.socialProviders).sort()).toEqual(["github", "google"]);
     expect(configured.socialProviders.google).not.toHaveProperty("scope");

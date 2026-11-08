@@ -1,5 +1,13 @@
 # 検証結果
 
+## 2026-11-08 モノレポ化（Forum / Things）
+
+- タスクCRUDを削除し、npm workspacesで`apps/forum`、`apps/things`、`packages/tools`、`packages/ui`へ分割した。
+- macOS arm64・Node 24.22.1で`npm ci --ignore-scripts`、`npm run check`、`npm run typecheck`、`npm test`、`npm run quality`、`npm run build`、`npm run test:e2e`（API・CLI・ブラウザ計26件）が成功。
+- ブラウザテストは390×844のタッチ端末設定のChromiumで実行した。実機のiOS Safari・Androidと、ソフトウェアキーボード表示中の挙動は未確認。
+- R2への写真保存と所有者分離はMiniflareで確認した。CloudflareのR2・D1への配備は未実施。
+- `tasks`テーブルを消すmigrationには`-- void:allow-destructive`を付けた。適用時のローカルの`tasks`は0行だった。
+
 ## 2026-11-08 miseによるNode固定
 
 - `scripts/mise`をmise 2026.11.4の`generate install-script --localize`で生成。手元の2026.3.9の`generate bootstrap -V 2026.11.4`はpanicしたため、公式リリースのSHASUMS256.txtで検証した2026.11.4で生成した。

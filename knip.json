@@ -1,15 +1,33 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "entry": [
-    "pages/**/*.{ts,tsx}",
-    "routes/**/*.ts",
-    "void.config.ts",
-    "auth.ts",
-    "env.ts",
-    "scripts/*.{mjs,ts}",
-    "tests/**/*.ts",
-    "db/schema.ts"
-  ],
-  "project": ["**/*.{ts,tsx,mjs,css}", "!node_modules/**", "!.void/**", "!dist/**", "!.tools/**"],
-  "ignoreDependencies": ["oxc-transform-react"]
+  "workspaces": {
+    ".": {
+      "entry": [
+        "pages/**/*.{ts,tsx}",
+        "routes/**/*.ts",
+        "void.config.ts",
+        "auth.ts",
+        "env.ts",
+        "scripts/*.{mjs,ts}",
+        "tests/**/*.ts",
+        "db/schema.ts"
+      ],
+      "project": [
+        "**/*.{ts,tsx,mjs,css}",
+        "!node_modules/**",
+        "!.void/**",
+        "!dist/**",
+        "!.tools/**"
+      ],
+      "ignoreDependencies": ["oxc-transform-react"]
+    },
+    "apps/*": {
+      "entry": ["src/schema.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "packages/*": {
+      "entry": ["src/**/*.test.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    }
+  }
 }

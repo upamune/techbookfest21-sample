@@ -1,18 +1,32 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { z } from "zod";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { taskResponse, tasksResponse, deletionResponse } from "../src/tasks/contracts";
+import { z } from "zod";
+import { replyOutput, threadDetailOutput, threadOutput } from "@pocket/forum/contracts";
+import { itemListOutput, itemOutput } from "@pocket/things/contracts";
 
 const execute = promisify(execFile);
+const expectedTools = [
+  "forum_add_reply",
+  "forum_create_thread",
+  "forum_get_thread",
+  "forum_list_threads",
+  "forum_set_reply_deleted",
+  "forum_set_thread_deleted",
+  "things_add_item",
+  "things_search_items",
+  "things_set_item_deleted",
+  "things_set_photo_deleted",
+  "things_update_item",
+];
 
 async function runCli(args: string[]) {
   const env = { ...process.env };
   delete env.FORCE_COLOR;
   delete env.NO_COLOR;
-  const { stdout, stderr } = await execute(process.execPath, ["scripts/tasks.ts", ...args], {
+  const { stdout, stderr } = await execute(process.execPath, ["scripts/pocket.ts", ...args], {
     timeout: 15000,
     env,
   });
@@ -29,165 +43,166 @@ function toolData(result: unknown): unknown {
   throw new Error("MCP returned no content");
 }
 
-test("HTTP and MCP share persistent tasks and idempotent mutations", async ({ request }) => {
-  const client = new Client({ name: "task-lab-test", version: "1.0.0" });
-  await client.connect(new StreamableHTTPClientTransport(new URL("http://127.0.0.1:5273/mcp")));
-  let id: string | undefined;
+function callTool(request: APIRequestContext, name: string, input: object) {
+  return request.post(`/api/tools/${name}`, { data: input });
+}
+
+async function connect(path = "/mcp") {
+  const client = new Client({ name: "pocket-test", version: "1.0.0" });
+  await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:5273${path}`)));
+  return client;
+}
+
+test("Web and MCP share forum data and separate human from agent authors", async ({ request }) => {
+  const client = await connect();
+  const title = `共有 ${crypto.randomUUID()}`;
+  const created = await callTool(request, "forum_create_thread", {
+    requestId: crypto.randomUUID(),
+    authorName: "自分",
+    title,
+    body: "人が立てたスレッド",
+  });
+  expect(created.status()).toBe(200);
+  const { thread } = threadOutput.parse(await created.json());
   try {
-    await expect(
-      runCli([
-        "call",
-        "set_task_completed",
-        JSON.stringify({ id: crypto.randomUUID(), completed: true }),
-        "--confirm",
-      ]),
-    ).rejects.toMatchObject({ code: 1, stdout: "" });
-    expect((await client.listTools()).tools.map((tool) => tool.name).sort()).toEqual([
-      "create_task",
-      "delete_task",
-      "list_tasks",
-      "set_task_completed",
-    ]);
-    const title = `日本語 ${crypto.randomUUID()}`;
-    const created = await request.post("/api/tasks", { data: { title } });
-    expect(created.status()).toBe(201);
-    const { task } = taskResponse.parse(await created.json());
-    id = task.id;
-    expect(task.completed).toBe(false);
-    expect(
-      tasksResponse.parse(toolData(await client.callTool({ name: "list_tasks", arguments: {} })))
-        .tasks,
-    ).toContainEqual(task);
-    for (let count = 0; count < 2; count += 1) {
-      const updated = taskResponse.parse(
-        toolData(
-          await client.callTool({ name: "set_task_completed", arguments: { id, completed: true } }),
-        ),
+    expect(thread.authorKind).toBe("human");
+    expect((await client.listTools()).tools.map((tool) => tool.name).sort()).toEqual(expectedTools);
+    const requestId = crypto.randomUUID();
+    const replies = [];
+    for (let attempt = 0; attempt < 2; attempt += 1)
+      replies.push(
+        replyOutput.parse(
+          toolData(
+            await client.callTool({
+              name: "forum_add_reply",
+              arguments: { requestId, threadId: thread.id, authorName: "Claude", body: "AIの返信" },
+            }),
+          ),
+        ).reply,
       );
-      expect(updated.task.completed).toBe(true);
-    }
-    expect(
-      tasksResponse.parse(await (await request.get("/api/tasks")).json()).tasks,
-    ).toContainEqual({ ...task, completed: true });
-    expect(
-      deletionResponse.parse(
-        toolData(await client.callTool({ name: "delete_task", arguments: { id } })),
-      ).deleted,
-    ).toBe(true);
-    expect(
-      deletionResponse.parse(await (await request.delete(`/api/tasks/${id}`)).json()).deleted,
-    ).toBe(false);
-    expect((await request.patch(`/api/tasks/${id}`, { data: { completed: false } })).status()).toBe(
-      404,
+    expect(replies[1]).toEqual(replies[0]);
+    expect(replies[0]?.authorKind).toBe("agent");
+    const detail = threadDetailOutput.parse(
+      await (await callTool(request, "forum_get_thread", { id: thread.id })).json(),
     );
-    expect(
-      (await client.callTool({ name: "create_task", arguments: { title: " " } })).isError,
-    ).toBe(true);
+    expect(detail.replies).toEqual([replies[0]]);
+    const invalid = await client.callTool({
+      name: "forum_add_reply",
+      arguments: { requestId, threadId: thread.id, authorName: "Claude", body: " " },
+    });
+    expect(invalid.isError).toBe(true);
+    const absent = await client.callTool({
+      name: "forum_get_thread",
+      arguments: { id: crypto.randomUUID() },
+    });
+    expect(absent.isError).toBe(true);
   } finally {
-    if (id) await request.delete(`/api/tasks/${id}`);
+    await callTool(request, "forum_set_thread_deleted", { id: thread.id, deleted: true });
+    await client.close();
+  }
+});
+
+test("MCP tools advertise read and write effects", async () => {
+  const client = await connect();
+  try {
+    const { tools } = await client.listTools();
+    const hints = (name: string) => tools.find((tool) => tool.name === name)?.annotations;
+    expect(hints("forum_list_threads")?.readOnlyHint).toBe(true);
+    expect(hints("things_add_item")?.readOnlyHint).toBe(false);
+    expect(hints("things_set_item_deleted")?.destructiveHint).toBe(true);
+  } finally {
     await client.close();
   }
 });
 
 test("input, origin and production boundaries fail closed", async ({ request }) => {
-  for (const body of [{ title: " " }, { title: "x".repeat(201) }, { title: "ok", extra: true }]) {
-    expect((await request.post("/api/tasks", { data: body })).status()).toBe(400);
+  const path = "/api/tools/forum_create_thread";
+  const valid = { requestId: crypto.randomUUID(), authorName: "自分", title: "題名", body: "本文" };
+  for (const body of [
+    { ...valid, title: " " },
+    { ...valid, title: "x".repeat(121) },
+    { ...valid, extra: true },
+    { ...valid, requestId: "invalid" },
+  ]) {
+    expect((await request.post(path, { data: body })).status()).toBe(400);
   }
   expect(
     (
-      await request.post("/api/tasks", {
-        data: "{",
-        headers: { "content-type": "application/json" },
-      })
+      await request.post(path, { data: "{", headers: { "content-type": "application/json" } })
     ).status(),
   ).toBe(400);
   expect(
     (
-      await request.post("/api/tasks", { data: "hello", headers: { "content-type": "text/plain" } })
+      await request.post(path, { data: "hello", headers: { "content-type": "text/plain" } })
     ).status(),
   ).toBe(415);
-  expect((await request.post("/api/tasks", { data: { title: "x".repeat(9000) } })).status()).toBe(
+  expect((await request.post(path, { data: { ...valid, body: "x".repeat(9000) } })).status()).toBe(
     413,
   );
-  expect((await request.delete("/api/tasks/invalid")).status()).toBe(400);
-  for (const path of ["/api/tasks", "/mcp", "/api/mcp"]) {
+  expect((await callTool(request, "create_task", {})).status()).toBe(404);
+  for (const target of [path, "/mcp", "/api/mcp"]) {
     expect(
-      (await request.get(path, { headers: { origin: "https://untrusted.example" } })).status(),
+      (await request.get(target, { headers: { origin: "https://untrusted.example" } })).status(),
     ).toBe(403);
     expect(
-      (await request.get(path, { headers: { "sec-fetch-site": "cross-site" } })).status(),
+      (await request.get(target, { headers: { "sec-fetch-site": "cross-site" } })).status(),
     ).toBe(403);
-    expect((await request.get(`http://127.0.0.1:4273${path}`)).status()).toBe(503);
+    expect((await request.get(`http://127.0.0.1:4273${target}`)).status()).toBe(503);
   }
-  const list = await request.get("/api/tasks");
+  const list = await callTool(request, "forum_list_threads", {});
   expect(list.headers()["cache-control"]).toBe("no-store");
 });
 
-test("SSR serves the application shell", async ({ request }) => {
+test("SSR serves the portal shell with mobile metadata", async ({ request }) => {
   const response = await request.get("/");
   expect(response.ok()).toBe(true);
-  expect(await response.text()).toContain("やることを追加して、終わったらチェック。");
+  const html = await response.text();
+  expect(html).toContain("持ち物としまった場所を記録して");
+  expect(html).toContain("viewport-fit=cover");
+  expect(html).toContain('rel="manifest"');
+  expect((await request.get("/manifest.webmanifest")).ok()).toBe(true);
 });
 
 test("legacy MCP endpoint advertises the same tools", async () => {
-  const client = new Client({ name: "legacy-test", version: "1.0.0" });
+  const client = await connect("/api/mcp");
   try {
-    await client.connect(
-      new StreamableHTTPClientTransport(new URL("http://127.0.0.1:5273/api/mcp")),
-    );
-    expect((await client.listTools()).tools.map((tool) => tool.name).sort()).toEqual([
-      "create_task",
-      "delete_task",
-      "list_tasks",
-      "set_task_completed",
-    ]);
+    expect((await client.listTools()).tools.map((tool) => tool.name).sort()).toEqual(expectedTools);
   } finally {
     await client.close();
   }
 });
 
-test("CLI uses the same persisted data and requires explicit writes", async ({ request }) => {
+test("CLI discovers app tools and requires confirmation for writes", async ({ request }) => {
   const tools = z
     .object({ tools: z.array(z.object({ name: z.string() })) })
     .parse(await runCli(["list"]));
-  expect(tools.tools.map((tool) => tool.name)).toContain("create_task");
+  expect(tools.tools.map((tool) => tool.name).sort()).toEqual(expectedTools);
+  const input = { requestId: crypto.randomUUID(), name: `CLI ${crypto.randomUUID()}` };
   await expect(
-    execute(process.execPath, ["scripts/tasks.ts", "call", "create_task", '{"title":"blocked"}']),
-  ).rejects.toMatchObject({ code: 1 });
-  const { task } = taskResponse.parse(
-    toolData(
-      await runCli([
-        "call",
-        "create_task",
-        JSON.stringify({ title: `CLI ${crypto.randomUUID()}` }),
-        "--confirm",
-      ]),
-    ),
+    execute(process.execPath, [
+      "scripts/pocket.ts",
+      "call",
+      "things_add_item",
+      JSON.stringify(input),
+    ]),
+  ).rejects.toMatchObject({ code: 1, stdout: "" });
+  const { item } = itemOutput.parse(
+    toolData(await runCli(["call", "things_add_item", JSON.stringify(input), "--confirm"])),
   );
   try {
+    const search = await callTool(request, "things_search_items", { query: input.name });
+    expect(itemListOutput.parse(await search.json()).items).toEqual([item]);
     expect(
-      tasksResponse.parse(await (await request.get("/api/tasks")).json()).tasks,
-    ).toContainEqual(task);
-    expect(
-      taskResponse.parse(
+      itemListOutput.parse(
         toolData(
-          await runCli([
-            "call",
-            "set_task_completed",
-            JSON.stringify({ id: task.id, completed: true }),
-            "--confirm",
-          ]),
+          await runCli(["call", "things_search_items", JSON.stringify({ query: input.name })]),
         ),
-      ).task.completed,
-    ).toBe(true);
-    expect(
-      deletionResponse.parse(
-        toolData(
-          await runCli(["call", "delete_task", JSON.stringify({ id: task.id }), "--confirm"]),
-        ),
-      ).deleted,
-    ).toBe(true);
+      ).items,
+    ).toEqual([item]);
+    await expect(
+      execute(process.execPath, ["scripts/pocket.ts", "call", "absent_tool", "{}", "--confirm"]),
+    ).rejects.toMatchObject({ code: 1 });
   } finally {
-    await request.delete(`/api/tasks/${task.id}`);
+    await callTool(request, "things_set_item_deleted", { id: item.id, deleted: true });
   }
 });

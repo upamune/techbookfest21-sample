@@ -1,0 +1,164 @@
+.search-bar {
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + var(--bar-height) + 1px);
+  z-index: 10;
+  width: min(100%, var(--content-width));
+  margin-inline: auto;
+  padding: 0.5rem var(--gutter-end) 0.5rem var(--gutter);
+  background: var(--background);
+}
+.search-bar > svg {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--gutter) + 0.75rem);
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--muted-foreground);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.search-bar [data-slot="input"] {
+  padding-inline-start: 2.375rem;
+  border-color: transparent;
+  background: var(--secondary);
+  appearance: none;
+}
+.thing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 0.75rem;
+  padding-top: 0.5rem;
+}
+.thing-card {
+  display: grid;
+  gap: 0.125rem;
+  width: 100%;
+  min-width: 0;
+  text-align: start;
+}
+button.thing-card:active .thing-thumb {
+  opacity: 0.8;
+}
+button.thing-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 0.75rem;
+}
+.thing-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: var(--secondary);
+}
+.thing-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.thing-letter {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: #fff;
+  font-size: 2.5rem;
+  font-weight: 650;
+}
+.thing-badge {
+  position: absolute;
+  right: 0.375rem;
+  bottom: 0.375rem;
+  padding: 0.0625rem 0.4375rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.62);
+  color: #fff;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.thing-name,
+.thing-place {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.thing-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.375rem;
+  min-height: 1.375rem;
+}
+.thing-place {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  min-height: 1.125rem;
+}
+.photo-strip {
+  display: flex;
+  gap: 0.5rem;
+  margin-inline: calc(var(--gutter) * -1) calc(var(--gutter-end) * -1);
+  padding-inline: var(--gutter) var(--gutter-end);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.photo-tile {
+  position: relative;
+  flex: none;
+  width: 6.5rem;
+  height: 6.5rem;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: var(--secondary);
+}
+.photo-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  color: #fff;
+}
+.photo-remove svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.6);
+}
+.photo-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+.photo-add svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.photo-add input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+@media (min-width: 30rem) {
+  .thing-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

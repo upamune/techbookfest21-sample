@@ -9,7 +9,7 @@ const providerCredentials = z.object({
 });
 
 export default defineAuth(({ defaults, env }) => {
-  const enabled = env.TASK_AUTH_ENABLED === true || env.TASK_AUTH_ENABLED === "true";
+  const enabled = env.POCKET_AUTH_ENABLED === true || env.POCKET_AUTH_ENABLED === "true";
   const github = providerCredentials.safeParse({
     clientId: env.AUTH_GITHUB_CLIENT_ID,
     clientSecret: env.AUTH_GITHUB_CLIENT_SECRET,
@@ -28,12 +28,12 @@ export default defineAuth(({ defaults, env }) => {
           before: async (account) => {
             if (account.providerId === "github")
               return isAllowedGithubId({
-                allowlist: env.TASK_ALLOWED_GITHUB_IDS,
+                allowlist: env.POCKET_ALLOWED_GITHUB_IDS,
                 id: account.accountId,
               });
             if (account.providerId === "google")
               return isAllowedGoogleSub({
-                allowlist: env.TASK_ALLOWED_GOOGLE_SUBS,
+                allowlist: env.POCKET_ALLOWED_GOOGLE_SUBS,
                 sub: account.accountId,
               });
             return false;
@@ -48,7 +48,7 @@ export default defineAuth(({ defaults, env }) => {
             github: {
               ...github.data,
               mapProfileToUser: (profile: unknown) =>
-                authorizeGithubProfile({ allowlist: env.TASK_ALLOWED_GITHUB_IDS, profile }),
+                authorizeGithubProfile({ allowlist: env.POCKET_ALLOWED_GITHUB_IDS, profile }),
             },
           }
         : {}),
@@ -57,7 +57,7 @@ export default defineAuth(({ defaults, env }) => {
             google: {
               ...google.data,
               mapProfileToUser: (profile: unknown) =>
-                authorizeGoogleProfile({ allowlist: env.TASK_ALLOWED_GOOGLE_SUBS, profile }),
+                authorizeGoogleProfile({ allowlist: env.POCKET_ALLOWED_GOOGLE_SUBS, profile }),
             },
           }
         : {}),

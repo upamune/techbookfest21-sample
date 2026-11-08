@@ -159,6 +159,83 @@ for (const count of [0, 1, 100]) {
   });
 }
 
+function heldResponse() {
+  let release: () => void = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { released, release };
+}
+
+test("initial load shows task-shaped skeleton rows without shifting the layout", async ({
+  page,
+}) => {
+  const tasks = Array.from({ length: 3 }, (_, index) => ({
+    id: crypto.randomUUID(),
+    title: `読み込み確認 ${index + 1}`,
+    completed: index === 0,
+    createdAt: "2026-11-06T00:00:00.000Z",
+  }));
+  const response = heldResponse();
+  await page.route("**/api/tasks", async (route) => {
+    await response.released;
+    await route.fulfill({ json: { tasks } });
+  });
+  await page.addInitScript(() => {
+    let total = 0;
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if ("hadRecentInput" in entry && entry.hadRecentInput === true) continue;
+        if ("value" in entry && typeof entry.value === "number") total += entry.value;
+      }
+      document.documentElement.dataset.layoutShift = String(total);
+    }).observe({ type: "layout-shift", buffered: true });
+  });
+  await page.goto("/");
+  const skeletonRows = page.locator('.task-list[aria-hidden="true"] .task-row');
+  await expect(skeletonRows).toHaveCount(3);
+  await expect(page.getByRole("status")).toHaveText("読み込み中…");
+  const skeletonHeights = await skeletonRows.evaluateAll((rows) =>
+    rows.map((row) => row.getBoundingClientRect().height),
+  );
+  response.release();
+  const rows = page.getByRole("listitem");
+  await expect(rows).toHaveCount(3);
+  await expect(page.locator('[data-slot="skeleton"]')).toHaveCount(0);
+  const rowHeights = await rows.evaluateAll((items) =>
+    items.map((item) => item.getBoundingClientRect().height),
+  );
+  expect(rowHeights).toEqual(skeletonHeights);
+  expect(
+    await page.evaluate(() => Number(document.documentElement.dataset.layoutShift ?? "0")),
+  ).toBe(0);
+});
+
+test("refresh keeps loaded tasks in place instead of returning to skeletons", async ({ page }) => {
+  const task = {
+    id: crypto.randomUUID(),
+    title: "更新中も残る行",
+    completed: false,
+    createdAt: "2026-11-06T00:00:00.000Z",
+  };
+  const response = heldResponse();
+  let hold = false;
+  await page.route("**/api/tasks", async (route) => {
+    if (hold) await response.released;
+    await route.fulfill({ json: { tasks: [task] } });
+  });
+  await page.goto("/");
+  const checkbox = page.getByRole("checkbox", { name: `${task.title}を完了`, exact: true });
+  await expect(checkbox).toBeEnabled();
+  hold = true;
+  await page.getByRole("button", { name: "更新", exact: true }).click();
+  await expect(checkbox).toBeDisabled();
+  await expect(page.getByText(task.title, { exact: true })).toBeVisible();
+  await expect(page.locator('[data-slot="skeleton"]')).toHaveCount(0);
+  response.release();
+  await expect(checkbox).toBeEnabled();
+});
+
 test("stalled deletion times out without retry and releases the dialog", async ({ page }) => {
   const task = {
     id: crypto.randomUUID(),

@@ -11,6 +11,7 @@ Read Void's installed `.agents/skills/void/SKILL.md` and relevant `node_modules/
 ## Architecture
 
 - React + Tailwind v4 + shadcn Base UI. Do not add Radix UI.
+- Every loading state renders skeletons (`src/components/ui/skeleton.tsx`) shaped like the content that replaces them, never a bare loading message. Loading must not shift the layout, and refreshes keep already loaded content in place. `tests/browser.spec.ts` asserts equal row heights and zero layout shift; add the same assertions for each new loading state.
 - Shared Zod contracts and standard Drizzle D1 service power HTTP and standard Streamable HTTP MCP.
 - Parse external data once at boundaries. Derive types from schemas. No unsafe casts, `any`, non-null assertions, or correctness suppressions.
 - Keep production API/MCP disabled until a separately approved authentication/authorization design exists. Loopback checks are not authentication.

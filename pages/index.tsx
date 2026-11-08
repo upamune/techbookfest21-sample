@@ -3,6 +3,7 @@ import { Plus, RefreshCw, Trash2, ListTodo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ function TaskWorkspace() {
   const cancelRef = useRef<HTMLButtonElement>(null);
   const [title, setTitle] = useState("");
   const [target, setTarget] = useState<Task | null>(null);
+  const loaded = model.status.kind === "ready" || model.status.kind === "refreshing";
   const disabled = model.busy || model.status.kind !== "ready";
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,7 +81,7 @@ function TaskWorkspace() {
                 onChange={(event) => setTitle(event.target.value)}
                 maxLength={200}
                 required
-                disabled={model.status.kind !== "ready"}
+                disabled={!loaded}
                 readOnly={model.busy}
               />
               <Button type="submit" disabled={disabled || !title.trim()}>
@@ -96,34 +98,15 @@ function TaskWorkspace() {
               {model.error}
             </p>
           )}
-          <TaskListHeading tasks={model.tasks} ready={model.status.kind === "ready"} />
-          <div className="task-list-content" aria-busy={model.busy}>
-            {model.status.kind === "loading" && (
-              <p role="status" className="list-message">
-                読み込み中…
-              </p>
-            )}
-            {model.status.kind === "failed" && (
-              <div className="error-message">
-                <p role="alert">{model.status.message}</p>
-                <Button className="mt-3" variant="outline" onClick={() => void model.refresh()}>
-                  再試行
-                </Button>
-              </div>
-            )}
-            {model.status.kind === "ready" && (
-              <TaskList
-                tasks={model.tasks}
-                busy={model.busy}
-                complete={model.complete}
-                select={(task, trigger) => {
-                  deleteTriggerRef.current = trigger;
-                  model.clearError();
-                  setTarget(task);
-                }}
-              />
-            )}
-          </div>
+          <TaskListHeading tasks={model.tasks} loaded={loaded} />
+          <TaskListContent
+            model={model}
+            select={(task, trigger) => {
+              deleteTriggerRef.current = trigger;
+              model.clearError();
+              setTarget(task);
+            }}
+          />
         </section>
       </main>
       <Dialog
@@ -174,18 +157,81 @@ function TaskWorkspace() {
   );
 }
 
-function TaskListHeading({ tasks, ready }: { tasks: Task[]; ready: boolean }) {
+function TaskListHeading({ tasks, loaded }: { tasks: Task[]; loaded: boolean }) {
   return (
     <div className="task-list-heading" aria-live="polite" aria-atomic="true">
       <h2>
-        表示中のタスク <span className="task-count">{ready ? tasks.length : "—"}</span>
+        表示中のタスク{" "}
+        {loaded ? (
+          <span className="task-count">{tasks.length}</span>
+        ) : (
+          <span className="task-count animate-pulse" aria-hidden="true">
+            <span className="invisible">0</span>
+          </span>
+        )}
       </h2>
-      {ready && (
+      {loaded ? (
         <span className="completion-count">
           完了 {tasks.filter((task) => task.completed).length}
         </span>
+      ) : (
+        <Skeleton className="completion-count" aria-hidden="true">
+          <span className="invisible">完了 0</span>
+        </Skeleton>
       )}
     </div>
+  );
+}
+
+function TaskListContent({
+  model,
+  select,
+}: {
+  model: ReturnType<typeof useTasks>;
+  select: (task: Task, trigger: HTMLButtonElement) => void;
+}) {
+  const { status } = model;
+  const busy = model.busy || status.kind === "refreshing";
+  return (
+    <div className="task-list-content" aria-busy={busy}>
+      {status.kind === "loading" && <TaskListSkeleton />}
+      {status.kind === "failed" && (
+        <div className="error-message">
+          <p role="alert">{status.message}</p>
+          <Button className="mt-3" variant="outline" onClick={() => void model.refresh()}>
+            再試行
+          </Button>
+        </div>
+      )}
+      {(status.kind === "ready" || status.kind === "refreshing") && (
+        <TaskList tasks={model.tasks} busy={busy} complete={model.complete} select={select} />
+      )}
+    </div>
+  );
+}
+
+const skeletonTitleWidths = ["62%", "45%", "54%"];
+
+function TaskListSkeleton() {
+  return (
+    <>
+      <p role="status" className="sr-only">
+        読み込み中…
+      </p>
+      <ul className="task-list" aria-hidden="true">
+        {skeletonTitleWidths.map((width) => (
+          <li key={width} className="task-row">
+            <Skeleton className="skeleton-checkbox" />
+            <div className="task-title">
+              <Skeleton className="skeleton-title" style={{ width }} />
+            </div>
+            <div className="skeleton-action">
+              <Skeleton className="skeleton-icon" />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

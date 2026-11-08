@@ -2,7 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { tasksResponse, taskResponse, deletionResponse, type Task } from "@/tasks/contracts";
 import { jsonRequest, request } from "./request";
 
-type Status = { kind: "loading" } | { kind: "ready" } | { kind: "failed"; message: string };
+type Status =
+  | { kind: "loading" }
+  | { kind: "refreshing" }
+  | { kind: "ready" }
+  | { kind: "failed"; message: string };
+
+function startLoading(current: Status): Status {
+  return current.kind === "ready" || current.kind === "refreshing"
+    ? { kind: "refreshing" }
+    : { kind: "loading" };
+}
 
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -11,7 +21,7 @@ export function useTasks() {
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
   const refresh = useCallback(async (signal?: AbortSignal) => {
-    setStatus({ kind: "loading" });
+    setStatus(startLoading);
     try {
       const result = await request({ path: "/api/tasks", schema: tasksResponse, init: { signal } });
       setTasks(result.tasks);

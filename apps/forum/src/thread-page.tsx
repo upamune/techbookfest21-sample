@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState, type FormEvent } from "react";
-import { Link, useParams, useRouter } from "@void/react";
-import { ChevronLeft, MessagesSquare, SendHorizontal, Trash2 } from "lucide-react";
+import { useParams, useRouter } from "@void/react";
+import { MessagesSquare, SendHorizontal, Trash2 } from "lucide-react";
 import { callTool } from "@pocket/tools/request";
 import { useMutation } from "@pocket/tools/use-mutation";
-import { useToolQuery } from "@pocket/tools/use-tool-query";
+import { forgetLoadedResults, useToolQuery } from "@pocket/tools/use-tool-query";
 import { AppBar } from "@pocket/ui/app-bar";
 import { Button } from "@pocket/ui/button";
 import { EmptyState, ErrorNotice, Snackbar, type SnackbarMessage } from "@pocket/ui/feedback";
@@ -22,11 +22,7 @@ import {
 import { AuthorLabel } from "./author-label";
 import { webAuthorName } from "./web-author";
 
-const backLink = (
-  <Link className="icon-link" href="/forum" aria-label="Forumに戻る">
-    <ChevronLeft aria-hidden="true" />
-  </Link>
-);
+const forumPage = { label: "Forum", href: "/forum" } as const;
 
 export function ThreadPage() {
   const params = useParams<{ id: string }>();
@@ -34,7 +30,7 @@ export function ThreadPage() {
   if (!id.success)
     return (
       <>
-        <AppBar title="スレッド" leading={backLink} />
+        <AppBar title="スレッド" parent={forumPage} />
         <main className="page">
           <ErrorNotice message="スレッドが見つかりません。" />
         </main>
@@ -87,7 +83,7 @@ function ThreadView({ id }: { id: ThreadId }) {
     <div className="thread-screen">
       <AppBar
         title="スレッド"
-        leading={backLink}
+        parent={forumPage}
         actions={
           <Button
             variant="ghost"
@@ -279,6 +275,7 @@ function DeleteThreadSheet({
         input: { id, deleted: true },
         schema: deletionOutput,
       });
+      forgetLoadedResults("forum_list_threads");
       onClose();
       await router.visit("/forum");
     });

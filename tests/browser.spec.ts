@@ -465,22 +465,78 @@ test("item list skeleton matches rows without shifting the layout", async ({ pag
   expect(await layoutShift(page)).toBe(0);
 });
 
-test("refresh keeps loaded rows in place instead of returning to skeletons", async ({ page }) => {
-  const threads = [threadFixture(0, "更新中も残る行")];
+test("a skeleton stays for at least 300ms even when data arrives at once", async ({ page }) => {
+  const threads = [threadFixture(0)];
+  await page.route(threadPattern, (route) => route.fulfill({ json: { threads } }));
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => {
+    const frames: { at: number; skeleton: boolean }[] = [];
+    Object.assign(window, { skeletonFrames: frames });
+    const sample = (at: number) => {
+      frames.push({ at, skeleton: document.querySelector('[data-slot="skeleton"]') !== null });
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await page.getByRole("navigation", { name: "アプリ" }).getByRole("link", { name: "Forum" }).tap();
+  await expect(page.locator("a.thread-row")).toBeVisible();
+  const visible = await page.evaluate(() => {
+    const frames = "skeletonFrames" in window ? window.skeletonFrames : [];
+    return Array.isArray(frames)
+      ? frames.filter((frame) => frame.skeleton).map((frame) => frame.at)
+      : [];
+  });
+  expect(visible.length).toBeGreaterThan(0);
+  expect((visible.at(-1) ?? 0) - (visible[0] ?? 0)).toBeGreaterThanOrEqual(250);
+});
+
+test("the skeleton crossfades into the empty state only on the first load", async ({ page }) => {
+  await page.route(threadPattern, (route) => route.fulfill({ json: { threads: [] } }));
+  await page.addInitScript(() => {
+    const original = document.startViewTransition.bind(document);
+    let count = 0;
+    document.startViewTransition = (update) => {
+      count += 1;
+      document.documentElement.dataset.transitions = String(count);
+      return original(update);
+    };
+  });
+  const transitions = () =>
+    page.evaluate(() => Number(document.documentElement.dataset.transitions ?? "0"));
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  const nav = page.getByRole("navigation", { name: "アプリ" });
+  await nav.getByRole("link", { name: "Forum" }).tap();
+  await expect(page.getByText("まだスレッドはありません")).toBeVisible();
+  expect(await transitions()).toBe(1);
+  await nav.getByRole("link", { name: "ホーム" }).tap();
+  await expect(page).toHaveURL(/\/$/);
+  await nav.getByRole("link", { name: "Forum" }).tap();
+  await expect(page.getByRole("main")).toHaveAttribute("aria-busy", "false");
+  expect(await transitions()).toBe(1);
+});
+
+test("returning to a tab shows loaded rows instead of skeletons", async ({ page }) => {
+  const items = [itemFixture(0, "戻っても残る行")];
+  const threads = [threadFixture(0)];
   const response = heldResponse();
   let hold = false;
-  await page.route(threadPattern, async (route) => {
+  await page.route(itemsPattern, async (route) => {
     if (hold) await response.released;
-    await route.fulfill({ json: { threads } });
+    await route.fulfill({ json: { items } });
   });
-  await page.goto("/forum");
-  const row = page.locator("a.thread-row");
-  await expect(row).toBeVisible();
+  await page.route(threadPattern, (route) => route.fulfill({ json: { threads } }));
+  await gotoReady(page, "/things");
+  const nav = page.getByRole("navigation", { name: "アプリ" });
+  await nav.getByRole("link", { name: "Forum" }).tap();
+  await expect(page.locator("a.thread-row")).toBeVisible();
   hold = true;
-  await page.getByRole("button", { name: "更新", exact: true }).tap();
-  await expect(page.getByRole("main")).toHaveAttribute("aria-busy", "true");
-  await expect(row).toBeVisible();
+  await nav.getByRole("link", { name: "Things" }).tap();
+  await expect(page).toHaveURL(/\/things$/);
+  await expect(page.locator("button.thing-card")).toBeVisible();
   await expect(page.locator('[data-slot="skeleton"]')).toHaveCount(0);
+  await expect(page.getByRole("main")).toHaveAttribute("aria-busy", "true");
   response.release();
   await expect(page.getByRole("main")).toHaveAttribute("aria-busy", "false");
 });
@@ -505,8 +561,9 @@ test("search keeps earlier results in place while the next query loads", async (
   await expect(page.getByRole("main")).toHaveAttribute("aria-busy", "false");
 });
 
-test("a failed first load offers retry and a failed refresh keeps the rows", async ({ page }) => {
+test("a failed first load offers retry and a failed return keeps the rows", async ({ page }) => {
   let fail = true;
+  await page.route(threadPattern, (route) => route.fulfill({ json: { threads: [] } }));
   await page.route(itemsPattern, async (route) => {
     if (fail) await route.fulfill({ status: 503, json: { error: "Temporary failure" } });
     else await route.fulfill({ json: { items: [itemFixture(0, "残る持ち物")] } });
@@ -518,9 +575,93 @@ test("a failed first load offers retry and a failed refresh keeps the rows", asy
   const row = page.locator("button.thing-card");
   await expect(row).toBeVisible();
   fail = true;
-  await page.getByRole("button", { name: "更新", exact: true }).tap();
+  const nav = page.getByRole("navigation", { name: "アプリ" });
+  await nav.getByRole("link", { name: "Forum" }).tap();
+  await expect(page).toHaveURL(/\/forum$/);
+  await expect(page.getByRole("main")).toHaveAttribute("aria-busy", "false");
+  await nav.getByRole("link", { name: "Things" }).tap();
   await expect(page.getByRole("alert")).toContainText("Temporary failure");
   await expect(row).toBeVisible();
+});
+
+test("phones get bottom navigation and a back link without breadcrumbs", async ({ page }) => {
+  const thread = threadFixture(0);
+  const { replyCount: _count, lastActivityAt: _last, ...detail } = thread;
+  await page.route(detailPattern, (route) =>
+    route.fulfill({ json: { thread: detail, replies: [] } }),
+  );
+  await gotoReady(page, "/forum");
+  await expect(page.getByRole("navigation", { name: "アプリ" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "パンくずリスト" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "更新", exact: true })).toHaveCount(0);
+  await gotoReady(page, `/forum/${thread.id}`);
+  await expect(page.getByRole("link", { name: "Forumに戻る" })).toBeVisible();
+});
+
+test("wider screens get a collapsible sidebar that remembers its state", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await gotoReady(page, "/forum");
+  const sidebar = page.locator(".app-sidebar");
+  await expect(sidebar).toBeVisible();
+  await expect(page.locator(".bottom-nav")).toBeHidden();
+  await expect(sidebar.getByRole("link", { name: "Forum" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  const widthOf = () => sidebar.evaluate((element) => element.getBoundingClientRect().width);
+  const expanded = await widthOf();
+  await sidebar.getByRole("button", { name: "サイドバーを閉じる" }).click();
+  await expect.poll(widthOf).toBeLessThan(expanded);
+  await expect(sidebar.getByRole("button", { name: "サイドバーを開く" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await expect(sidebar.getByRole("link", { name: "Things" })).toBeVisible();
+  await observeLayoutShift(page);
+  await gotoReady(page, "/forum");
+  await expect.poll(widthOf).toBeLessThan(expanded);
+  expect(await layoutShift(page)).toBe(0);
+  await sidebar.getByRole("link", { name: "Things" }).click();
+  await expect(page).toHaveURL(/\/things$/);
+  await sidebar.getByRole("button", { name: "サイドバーを開く" }).click();
+  await expect.poll(widthOf).toBe(expanded);
+});
+
+test("phones do not show the sidebar", async ({ page }) => {
+  await gotoReady(page, "/forum");
+  await expect(page.locator(".app-sidebar")).toBeHidden();
+});
+
+test("wider screens use breadcrumbs instead of bottom navigation", async ({ page }) => {
+  const thread = threadFixture(0);
+  const { replyCount: _count, lastActivityAt: _last, ...detail } = thread;
+  await page.route(detailPattern, (route) =>
+    route.fulfill({ json: { thread: detail, replies: [] } }),
+  );
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await gotoReady(page, `/forum/${thread.id}`);
+  const crumbs = page.getByRole("navigation", { name: "パンくずリスト" });
+  await expect(crumbs.getByRole("listitem")).toHaveCount(3);
+  await expect(crumbs.getByText("スレッド", { exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(page.getByRole("link", { name: "Forumに戻る" })).toHaveCount(0);
+  await expect(page.locator(".bottom-nav")).toBeHidden();
+  await expect(page.getByRole("heading", { level: 1, name: "スレッド" })).toBeAttached();
+  const edges = (selector: string) =>
+    page.locator(selector).evaluate((element) => {
+      const { left, right } = element.getBoundingClientRect();
+      return { left, right };
+    });
+  expect(await edges(".reply-composer-row")).toEqual(await edges(".thread-head"));
+  await crumbs.getByRole("link", { name: "Forum", exact: true }).click();
+  await expect(page).toHaveURL(/\/forum$/);
+  await expect(crumbs.getByRole("listitem")).toHaveCount(2);
+  await crumbs.getByRole("link", { name: "Pocket", exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(crumbs.getByRole("link")).toHaveCount(0);
+  await expect(crumbs.getByRole("img", { name: "Pocket" })).toBeVisible();
 });
 
 test("an unknown thread reports not found and offers the way back", async ({ page }) => {

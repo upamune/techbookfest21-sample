@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { auth } from "void/client";
+import { forgetLoadedResults } from "@pocket/tools/use-tool-query";
 import { Button } from "@pocket/ui/button";
 import { ErrorNotice } from "@pocket/ui/feedback";
 import { Skeleton } from "@pocket/ui/skeleton";
@@ -47,7 +48,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
     try {
       const result = await auth.signOut();
       if (result.error) setError("ログアウトできませんでした。再試行してください。");
-      else await session.refetch();
+      else {
+        forgetLoadedResults();
+        await session.refetch();
+      }
     } catch {
       setError("通信に失敗しました。再試行してください。");
     } finally {

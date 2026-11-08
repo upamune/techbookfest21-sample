@@ -7,10 +7,12 @@
     "./define-tool": "./src/define-tool.ts",
     "./request": "./src/request.ts",
     "./use-tool-query": "./src/use-tool-query.ts",
-    "./use-mutation": "./src/use-mutation.ts"
+    "./use-mutation": "./src/use-mutation.ts",
+    "./crossfade": "./src/crossfade.ts"
   },
   "dependencies": {
     "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "zod": "^4.6.7"
   }
 }

@@ -143,7 +143,7 @@ a.thread-row:focus-visible {
   display: flex;
   align-items: flex-end;
   gap: 0.5rem;
-  width: min(100%, var(--content-width));
+  width: min(100%, calc(var(--content-width) - var(--gutter) - var(--gutter-end)));
   margin-inline: auto;
 }
 .reply-composer .error-message {

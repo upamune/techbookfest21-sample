@@ -16,6 +16,12 @@ export default defineConfig({
       { name: "apple-mobile-web-app-title", content: "Pocket" },
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
     ],
+    script: [
+      {
+        innerHTML:
+          'try{if(localStorage.getItem("pocket-sidebar")==="collapsed")document.documentElement.dataset.sidebar="collapsed"}catch{}',
+      },
+    ],
     link: [
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       { rel: "icon", href: "/favicon.ico", sizes: "any" },

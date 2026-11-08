@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Boxes, Plus, RefreshCw, Search } from "lucide-react";
+import { Boxes, Plus, Search } from "lucide-react";
 import { callTool } from "@pocket/tools/request";
 import { useMutation } from "@pocket/tools/use-mutation";
 import { useToolQuery } from "@pocket/tools/use-tool-query";
 import { AppBar } from "@pocket/ui/app-bar";
-import { Button } from "@pocket/ui/button";
 import { EmptyState, ErrorNotice, Snackbar, type SnackbarMessage } from "@pocket/ui/feedback";
 import { Input } from "@pocket/ui/input";
 import { Skeleton } from "@pocket/ui/skeleton";
@@ -13,6 +12,7 @@ import { ItemCard } from "./item-card";
 import { ItemSheet, type ItemSheetMode } from "./item-sheet";
 
 const searchDelay = 250;
+const aboveFoldCards = 12;
 
 function useDebouncedValue(value: string) {
   const [debounced, setDebounced] = useState(value);
@@ -55,20 +55,7 @@ export function ItemsPage() {
 
   return (
     <>
-      <AppBar
-        title="Things"
-        actions={
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="更新"
-            disabled={state.kind === "loading" || state.kind === "refreshing"}
-            onClick={() => void refresh()}
-          >
-            <RefreshCw aria-hidden="true" />
-          </Button>
-        }
-      />
+      <AppBar title="Things" />
       <div className="search-bar" role="search">
         <Search aria-hidden="true" />
         <Input
@@ -139,9 +126,13 @@ function ItemList({
     );
   return (
     <ul className="thing-grid">
-      {items.map((item) => (
+      {items.map((item, index) => (
         <li key={item.id}>
-          <ItemCard item={item} onSelect={() => onSelect(item)} />
+          <ItemCard
+            item={item}
+            aboveFold={index < aboveFoldCards}
+            onSelect={() => onSelect(item)}
+          />
         </li>
       ))}
     </ul>

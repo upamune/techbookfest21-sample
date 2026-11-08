@@ -25,10 +25,17 @@ function initialOf(name: string) {
   return "";
 }
 
-function Thumbnail({ item }: { item: Item }) {
+function Thumbnail({ item, aboveFold }: { item: Item; aboveFold: boolean }) {
   const [cover] = item.photos;
   if (cover !== undefined)
-    return <img src={photoUrl(cover.id, "thumb")} alt="" loading="lazy" decoding="async" />;
+    return (
+      <img
+        src={photoUrl(cover.id, "thumb")}
+        alt=""
+        loading={aboveFold ? "eager" : "lazy"}
+        decoding={aboveFold ? "sync" : "async"}
+      />
+    );
   return (
     <span
       className="thing-letter"
@@ -40,12 +47,20 @@ function Thumbnail({ item }: { item: Item }) {
   );
 }
 
-export function ItemCard({ item, onSelect }: { item: Item; onSelect: () => void }) {
+export function ItemCard({
+  item,
+  aboveFold,
+  onSelect,
+}: {
+  item: Item;
+  aboveFold: boolean;
+  onSelect: () => void;
+}) {
   const place = item.location || item.category || "場所は未設定";
   return (
     <button type="button" className="thing-card" onClick={onSelect}>
       <span className="thing-thumb">
-        <Thumbnail item={item} />
+        <Thumbnail item={item} aboveFold={aboveFold} />
         {item.quantity > 1 && <span className="thing-badge">×{item.quantity}</span>}
       </span>
       <span className="thing-name">{item.name}</span>

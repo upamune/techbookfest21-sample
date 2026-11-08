@@ -1,9 +1,9 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Link, useRouter } from "@void/react";
-import { MessagesSquare, Plus, RefreshCw } from "lucide-react";
+import { MessagesSquare, Plus } from "lucide-react";
 import { callTool } from "@pocket/tools/request";
 import { useMutation } from "@pocket/tools/use-mutation";
-import { useToolQuery } from "@pocket/tools/use-tool-query";
+import { forgetLoadedResults, useToolQuery } from "@pocket/tools/use-tool-query";
 import { AppBar } from "@pocket/ui/app-bar";
 import { Button } from "@pocket/ui/button";
 import { EmptyState, ErrorNotice } from "@pocket/ui/feedback";
@@ -27,20 +27,7 @@ export function ThreadsPage() {
   const [composing, setComposing] = useState(false);
   return (
     <>
-      <AppBar
-        title="Forum"
-        actions={
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="更新"
-            disabled={state.kind === "loading" || state.kind === "refreshing"}
-            onClick={() => void refresh()}
-          >
-            <RefreshCw aria-hidden="true" />
-          </Button>
-        }
-      />
+      <AppBar title="Forum" />
       <main className="page" aria-busy={state.kind === "loading" || state.kind === "refreshing"}>
         {state.kind === "stale" && <ErrorNotice message={state.message} />}
         {state.kind === "loading" && <ThreadListSkeleton />}
@@ -135,6 +122,7 @@ function NewThreadSheet({ open, onClose }: { open: boolean; onClose: () => void 
       setTitle("");
       setBody("");
       setRequestId(crypto.randomUUID());
+      forgetLoadedResults("forum_list_threads");
       onClose();
       await router.visit(`/forum/${thread.id}`);
     });

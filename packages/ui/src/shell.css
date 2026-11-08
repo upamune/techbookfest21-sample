@@ -39,6 +39,8 @@
   --gutter-end: max(1rem, env(safe-area-inset-right));
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --keyboard-inset: 0px;
+  --sidebar-width: 0px;
+  --nav-offset: calc(var(--nav-height) + var(--safe-bottom));
   --content-width: 40rem;
 }
 @layer base {
@@ -103,13 +105,22 @@
   flex: none;
   margin-inline-end: -0.5rem;
 }
+.app-bar-crumbs,
+.app-sidebar {
+  display: none;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease-out);
+}
 .page {
   width: min(100%, var(--content-width));
   margin-inline: auto;
   padding-inline: var(--gutter) var(--gutter-end);
 }
 .tab-screen .page {
-  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 5.5rem);
+  padding-bottom: calc(var(--nav-offset) + 5.5rem);
 }
 .bottom-nav {
   position: fixed;
@@ -147,7 +158,7 @@
 .fab {
   position: fixed;
   right: var(--gutter-end);
-  bottom: calc(var(--nav-height) + var(--safe-bottom) + 1rem);
+  bottom: calc(var(--nav-offset) + 1rem);
   z-index: 15;
   display: grid;
   place-items: center;
@@ -363,7 +374,8 @@
 }
 .snackbar-region {
   position: fixed;
-  inset: auto var(--gutter-end) calc(var(--nav-height) + var(--safe-bottom) + 5.5rem) var(--gutter);
+  inset: auto var(--gutter-end) calc(var(--nav-offset) + 5.5rem)
+    calc(var(--sidebar-width) + var(--gutter));
   z-index: 30;
   pointer-events: none;
 }
@@ -487,8 +499,139 @@
   .portal-card:hover {
     background: #fafafa;
   }
+  .app-bar-crumbs a:hover {
+    color: var(--foreground);
+  }
+  .sidebar-item:hover {
+    color: var(--foreground);
+  }
 }
 @media (min-width: 40rem) {
+  :root {
+    --nav-offset: 0px;
+    --sidebar-width: 13.5rem;
+  }
+  :root[data-sidebar="collapsed"] {
+    --sidebar-width: 3.75rem;
+  }
+  .app-frame {
+    padding-inline-start: var(--sidebar-width);
+  }
+  .app-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 25;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    width: var(--sidebar-width);
+    padding: 0.25rem 0.5rem;
+    border-inline-end: 1px solid var(--border);
+    background: var(--background);
+  }
+  .sidebar-toggle {
+    align-self: flex-end;
+    color: var(--muted-foreground);
+    margin-bottom: 0.25rem;
+  }
+  .sidebar-icon-open,
+  :root[data-sidebar="collapsed"] .sidebar-icon-close {
+    display: none;
+  }
+  :root[data-sidebar="collapsed"] .sidebar-icon-open {
+    display: block;
+  }
+  :root[data-sidebar="collapsed"] .sidebar-toggle {
+    align-self: center;
+  }
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: var(--touch-target);
+    padding-inline: 0.625rem;
+    border-radius: var(--radius-lg);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .sidebar-item svg {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  .sidebar-item[aria-current="page"] {
+    background: var(--secondary);
+    color: var(--foreground);
+    font-weight: 600;
+  }
+  .sidebar-item:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  :root[data-sidebar="collapsed"] .sidebar-item {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .bottom-nav {
+    display: none;
+  }
+  .app-bar-back {
+    display: none;
+  }
+  .app-bar-title,
+  :root[data-sidebar="collapsed"] .sidebar-item span {
+    position: absolute;
+    flex: none;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .app-bar-crumbs {
+    display: block;
+    flex: 1;
+    min-width: 0;
+  }
+  .app-bar-crumbs ol {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    font-size: 0.875rem;
+  }
+  .app-bar-crumbs li {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: var(--touch-target);
+    color: var(--muted-foreground);
+  }
+  .app-bar-crumbs li + li::before {
+    content: "/" / "";
+    color: var(--border);
+  }
+  .app-bar-crumbs li[aria-current="page"] {
+    flex: 0 1 auto;
+    min-width: 0;
+    color: var(--foreground);
+    font-weight: 600;
+  }
+  .app-bar-crumbs a {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-target);
+    color: inherit;
+    text-decoration: none;
+  }
+  .app-bar-crumbs a:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-md);
+  }
   .sheet {
     inset: 50% auto auto 50%;
     width: min(100% - 2rem, 28rem);

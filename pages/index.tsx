@@ -46,12 +46,7 @@ function TaskWorkspace() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            p.
-          </span>
-          <span>Pocket</span>
-        </div>
+        <img className="brand" src="/pocket-horizontal.svg" alt="Pocket" width={88} height={32} />
       </header>
       <main className="workspace">
         <section aria-label="タスク管理">

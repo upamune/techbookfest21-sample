@@ -48,11 +48,9 @@ function TaskWorkspace() {
       <header className="app-header">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
-            v.
+            p.
           </span>
-          <span>
-            Void <span className="brand-divider">/</span> Task Lab
-          </span>
+          <span>Pocket</span>
         </div>
         <span className="environment-label">{environmentLabel}</span>
       </header>

@@ -83,7 +83,7 @@ function SignIn() {
   }
   return (
     <main className="workspace">
-      <h1>Task Lab にログイン</h1>
+      <h1>Pocket にログイン</h1>
       <p className="workspace-description">
         管理者が許可したGoogleまたはGitHubアカウントでログインしてください。
       </p>

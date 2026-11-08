@@ -9,7 +9,7 @@ function toolResult(value: object, isError = false): CallToolResult {
 }
 
 function createMcpServer(service: TaskService) {
-  const server = new McpServer({ name: "void-task-lab", version: "0.2.0" });
+  const server = new McpServer({ name: "pocket", version: "0.2.0" });
   server.registerTool(
     "list_tasks",
     {

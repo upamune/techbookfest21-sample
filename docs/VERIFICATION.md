@@ -1,5 +1,15 @@
 # 検証結果
 
+## 2026-11-08 miseによるNode固定
+
+- `scripts/mise`をmise 2026.11.4の`generate install-script --localize`で生成。手元の2026.3.9の`generate bootstrap -V 2026.11.4`はpanicしたため、公式リリースのSHASUMS256.txtで検証した2026.11.4で生成した。
+- macOS arm64で、未導入状態の`.mise/`へmise本体をチェックサム検証して取得できた。
+- `mise.lock`のNode 24.22.1のチェックサムは、nodejs.orgのSHASUMS256.txtと一致した（darwin/linux/win）。
+- `scripts/mise install --locked`、`npm ci --ignore-scripts`、`npm run check`、Knip、`npm run dev`の起動とAPI応答が成功。
+- `scripts/setup.sh`をリポジトリ外のカレントディレクトリから実行し、次の状態から全て終了コード0で復旧した: `.mise`と`node_modules`なし、2回目の実行、mise本体の破損・欠落、`node`バイナリの欠落、同梱npmの欠落、Nodeインストール全体の欠落、`node_modules`の一部欠落。
+- `mise.lock`のNodeチェックサムを書き換えると、`scripts/setup.sh`は入れ直しを試みた後に終了コード1で止まった。元に戻すと再実行で復旧した。Linuxでの`scripts/setup.sh`は未実行。
+- 同日、macOS arm64・Node 24.22.1でブラウザ8件を含む`npm run test:e2e`の13件がローカルで成功した。Linux executorのChromium制限はこの環境では発生しなかった。
+
 ## 2026-11-07 認証付き公開準備
 
 - check / typecheck / unit 123件 / build / Knip / cccc / similarity-ts 成功。

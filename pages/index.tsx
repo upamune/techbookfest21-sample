@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from "react";
-import { Plus, RefreshCw, Trash2, Terminal, ListTodo } from "lucide-react";
+import { Plus, RefreshCw, Trash2, ListTodo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -26,8 +26,6 @@ export default function HomePage() {
   );
 }
 
-const environmentLabel = import.meta.env.DEV ? "ローカル開発用" : "プライベートワークスペース";
-
 function TaskWorkspace() {
   const model = useTasks();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,7 +50,6 @@ function TaskWorkspace() {
           </span>
           <span>Pocket</span>
         </div>
-        <span className="environment-label">{environmentLabel}</span>
       </header>
       <main className="workspace">
         <section aria-label="タスク管理">
@@ -128,26 +125,6 @@ function TaskWorkspace() {
             )}
           </div>
         </section>
-        <aside className="developer-note">
-          <details>
-            <summary>
-              <Terminal aria-hidden="true" />
-              開発者向け情報
-            </summary>
-            <div className="developer-note-content">
-              <h2>MCPでつなぐ</h2>
-              <p>
-                同じマシンのクライアントから /mcp に接続。標準のStreamable
-                HTTPで4つの操作を利用できます。
-              </p>
-              <p>本番アクセスは認証と管理者による有効化が必要です。</p>
-            </div>
-          </details>
-        </aside>
-        <footer className="workspace-footer">
-          <span>Void · React · Hono · D1 · Drizzle</span>
-          <span>構成検証用サンプル</span>
-        </footer>
       </main>
       <Dialog
         open={target !== null}

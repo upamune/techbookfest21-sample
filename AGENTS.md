@@ -15,7 +15,7 @@ Read Void's installed `.agents/skills/void/SKILL.md` and relevant `node_modules/
 - Each app defines its operations once with `toolFactory` in `apps/*/src/tools.ts`. The same definitions serve the Web UI (`/api/tools/:name`), standard Streamable HTTP MCP (`/mcp`), and the CLI. Adding an app means one entry in `src/app-tools.ts` and `src/app-catalog.ts`.
 - Design every screen for phones first: 44px touch targets, 16px inputs, safe-area insets, bottom sheets for forms. `tests/browser.spec.ts` runs at phone size.
 - Parse external data once at boundaries. Derive types from schemas. No unsafe casts, `any`, non-null assertions, or correctness suppressions.
-- Keep production API/MCP disabled until a separately approved authentication/authorization design exists. Loopback checks are not authentication.
+- Production API/MCP return 503 until a login provider has both credentials and an allowlist (`src/security/auth-config.ts`). Do not remove this boundary or open production without authentication. Loopback checks are not authentication.
 - No automatic deployment, remote resource creation, credential setup, or public exposure.
 - Prefer readable code over explanatory comments. Preserve license notices and externally required directives.
 

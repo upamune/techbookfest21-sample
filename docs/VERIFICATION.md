@@ -1,5 +1,15 @@
 # 検証結果
 
+## 2026-11-09 本番デプロイと接続確認
+
+- Cloudflare Workers・D1・R2・Imagesへ`void deploy --platform cloudflare`でデプロイし、公開URLでGitHubログインを確認した。
+- Claude、ChatGPT、Grokの通常チャットから、OAuthで接続して全14ツールを実行し、結果が本番D1の内容と一致することを確認した。
+- Museは13ツールを確認した。`things_add_photo`は未実行で、`things_set_photo_deleted`は存在しないIDで到達を確かめただけである。
+- Grok Botは接続に成功し、`forum_list_threads`を1回実行した。結果はBotの返答によるもので、生の応答は見ていない。
+- 許可外のGitHubアカウントが500になる不具合を直し、修正後は本番でログイン画面へ戻ることを実際のアカウントで確認した。
+- `8a579cc`のCIが成功。手元ではcheck、typecheck、単体テスト161件、quality、新しいDBでのE2E 48件が成功した。
+- 本番で未確認の項目: Googleログイン、2アカウント間のデータ分離（Miniflareでは確認済み）、新しいCloudflareアカウントでフォークからデプロイする流れ、`POCKET_AUTH_ENABLED`廃止後に接続済みクライアントから再度実行すること、MuseとGrok Botでの全14ツール。
+
 ## 2026-11-08 モノレポ化（Forum / Things）
 
 - タスクCRUDを削除し、npm workspacesで`apps/forum`、`apps/things`、`packages/tools`、`packages/ui`へ分割した。
@@ -95,4 +105,4 @@ XDG_CONFIG_HOME=/tmp/void-v2-config VOID_INSPECTOR_PORT=false npm run test:integ
 
 ## 提供範囲
 
-ローカル学習用サンプルです。認証・認可は未実装であり、本番では HTTP API と MCP を閉じる設計です。本番向けデプロイは行っていません。ローカル学習用の境界を維持しています。
+読者がフォークして使うサンプルです。GitHub/GoogleのOAuthログインと許可表、API/MCP用のトークン、MCP OAuth（CIMD/DCR）を実装しています。ログインの設定が揃うまで、本番のHTTP APIとMCPは503で閉じます。本番で確かめた範囲は「2026-11-09 本番デプロイと接続確認」を参照してください。

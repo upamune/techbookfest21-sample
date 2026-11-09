@@ -9,7 +9,7 @@
 
 Void / React / Hono / Cloudflare D1・R2 / 標準Drizzle / Tailwind CSS v4 / shadcn Base UI / 標準MCPを使用します。pstackのTypeScript best practices・no-commentsと、cccc・similarity-ts・Knipを導入しています。
 
-公開先はまだありません。本番アクセスは既定で無効です。Cloudflareのリソース作成・認証設定・公開は別途確認してから行います。[公開準備と境界](docs/DEPLOYMENT.md)を参照してください。
+Cloudflare Workersへ自分でデプロイして使います。ログインの設定が揃うまで、本番のAPI/MCPは503で閉じています。Cloudflareのリソース作成・認証設定・公開は内容を確認してから行ってください。[認証付きの公開](docs/DEPLOYMENT.md)を参照してください。
 
 ## 起動
 
@@ -104,9 +104,11 @@ npm run test:e2e
 
 ## MCPをOAuthで接続する
 
-ログインの設定が済んだビルドでは、`/mcp`がOAuth 2.1の保護対象になります。未認証の要求には`WWW-Authenticate`で案内を返し、MCPクライアントはログインと同意のあとでトークンを受け取ります。発行したトークンは`/mcp`専用で、Forum と Things の全操作ができます。接続はポータルの「接続中のアプリ」からいつでも解除でき、解除するとそのアプリはすぐに使えなくなります。
+ログインの設定が済んだビルドでは、`/mcp`がOAuth 2.1の保護対象になります。未認証の要求には`WWW-Authenticate`で案内を返し、MCPクライアントはログインと同意のあとでトークンを受け取ります。発行したトークンは`/mcp`専用で、Forum と Things の全操作ができます。接続は設定画面の「接続中のアプリ」からいつでも解除でき、解除するとそのアプリはすぐに使えなくなります。
 
 クライアントの登録は Client ID Metadata Document（CIMD）を主に使います。文書を取りに行くホストは`POCKET_CIMD_ALLOWED_HOSTS`（JSON配列、既定は`["claude.ai","chatgpt.com","openai.com"]`、完全一致）に限ります。一覧にないホストは拒否してログに`mcp_oauth.cimd_host_rejected`を残すので、使うクライアントのホストを追加してください。CIMDに対応していないクライアントのために Dynamic Client Registration も有効にしています。
+
+別の選択肢として、Cloudflare Accessの[Managed OAuth](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/)があります。認可サーバーの役割をAccessに任せられ、MCPサーバーはAccessが渡すJWT（`Cf-Access-Jwt-Assertion`）を検証します。現時点で採用していない理由は3つです。実際のMCPクライアントでの動作をまだ確かめていません。アプリ側のOAuthとは併用せず置き換えになるため、Web UIやCLIのトークンとの共存も確かめる必要があります。フォークする人にZero Trustの組織とAccessアプリの設定が増えます。
 
 手元で試す手順:
 
@@ -117,12 +119,12 @@ npm run test:e2e
 
 `npm run dev`は認証を通さない開発モードなので、OAuthは動きません。
 
-## 公開しないための境界
+## 公開と認証の境界
 
-開発ビルドはloopbackからだけAPI/MCPを受け付けます。本番では認証が既定で無効になっており、API/MCPへの要求を503で拒否します。認証を有効にしたあとはセッションまたは失効可能なBearerトークンが必要で、全操作をユーザー別に分離します。MCPはOAuthでも接続でき、手動設定したBearerトークンも引き続き使えます。異なるOriginやcross-site要求は拒否し、本文の上限8KiB（写真の送信のみ2.5MB）・入力スキーマ・DB制約・パラメータ化SQLで検証します。
+開発ビルドはloopbackからだけAPI/MCPを受け付けます。本番では、資格情報と許可表の揃ったログイン方法が1つもない間、API/MCPへの要求を503で拒否します。揃ったあとはセッションまたは失効可能なBearerトークンが必要で、全操作をユーザー別に分離します。MCPはOAuthでも接続でき、手動設定したBearerトークンも引き続き使えます。異なるOriginやcross-site要求は拒否し、本文の上限8KiB（写真の送信のみ2.5MB）・入力スキーマ・DB制約・パラメータ化SQLで検証します。
 
-同じマシンのプロセスはローカルデータを操作できます。localhost制限は認証の代わりではありません。公開前には認証設定・レート制限・バックアップなど運用を確認してください。本番のログインと公開URLでの動作は未検証です。
+同じマシンのプロセスはローカルデータを操作できます。localhost制限は認証の代わりではありません。公開前には認証設定・レート制限・バックアップなど運用を確認してください。GitHubログインと公開URLでの動作は本番で確認済みです。Googleログイン、2アカウント間のデータ分離、新しいCloudflareアカウントでのデプロイは本番では確認していません。
 
-リポジトリは [upamune/techbookfest21-sample](https://github.com/upamune/techbookfest21-sample) です。Cloudflareへの接続・デプロイは含みません。
+リポジトリは [upamune/techbookfest21-sample](https://github.com/upamune/techbookfest21-sample) です。自動デプロイの仕組みは含みません。
 
 検証結果と未実行項目は[検証記録](docs/VERIFICATION.md)を参照してください。

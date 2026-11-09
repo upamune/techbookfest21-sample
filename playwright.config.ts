@@ -1,5 +1,12 @@
 import { defineConfig } from "@playwright/test";
 
+const phone = {
+  viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 3,
+  isMobile: true,
+  hasTouch: true,
+};
+
 export default defineConfig({
   testDir: "./tests",
   workers: 1,
@@ -15,12 +22,12 @@ export default defineConfig({
     {
       name: "browser",
       testMatch: "**/browser.spec.ts",
-      use: {
-        viewport: { width: 390, height: 844 },
-        deviceScaleFactor: 3,
-        isMobile: true,
-        hasTouch: true,
-      },
+      use: phone,
+    },
+    {
+      name: "oauth",
+      testMatch: "**/oauth.spec.ts",
+      use: { ...phone, baseURL: "http://127.0.0.1:4281" },
     },
   ],
   webServer: [

@@ -12,6 +12,7 @@ import { forgetLoadedResults } from "@pocket/tools/use-tool-query";
 import { Button } from "@pocket/ui/button";
 import { ErrorNotice } from "@pocket/ui/feedback";
 import { Skeleton } from "@pocket/ui/skeleton";
+import { oauthAuthClient } from "./oauth-client";
 import { TokenPanel } from "./token-panel";
 
 type Account = { email: string; busy: boolean; error: string | null; signOut: () => void };
@@ -115,7 +116,7 @@ function SignIn() {
     setBusy(true);
     setError(null);
     try {
-      const result = await auth.signIn.social({ provider, callbackURL: "/" });
+      const result = await oauthAuthClient.signIn.social({ provider, callbackURL: "/" });
       if (result.error) setError("ログインできませんでした。管理者の認証設定を確認してください。");
     } catch {
       setError("通信に失敗しました。再試行してください。");

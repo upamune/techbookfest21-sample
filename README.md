@@ -102,9 +102,24 @@ npm run test:e2e
 
 `npm run ci`は品質チェックとビルド、実HTTP/MCP/D1およびブラウザーテストを実行します。GitHub Actionsは検証のみで、デプロイしません。
 
+## MCPをOAuthで接続する
+
+`POCKET_AUTH_ENABLED=true`のビルドでは、`/mcp`がOAuth 2.1の保護対象になります。未認証の要求には`WWW-Authenticate`で案内を返し、MCPクライアントはログインと同意のあとでトークンを受け取ります。発行したトークンは`/mcp`専用で、Forum と Things の全操作ができます。
+
+クライアントの登録は Client ID Metadata Document（CIMD）を主に使います。文書を取りに行くホストは`POCKET_CIMD_ALLOWED_HOSTS`（JSON配列、既定は`["claude.ai","chatgpt.com","openai.com"]`、完全一致）に限ります。一覧にないホストは拒否してログに`mcp_oauth.cimd_host_rejected`を残すので、使うクライアントのホストを追加してください。CIMDに対応していないクライアントのために Dynamic Client Registration も有効にしています。
+
+手元で試す手順:
+
+1. GitHubのOAuth Appを作り、callbackを`http://127.0.0.1:4173/api/auth/callback/github`にします。
+2. `.env`に`BETTER_AUTH_SECRET`、`POCKET_AUTH_ENABLED=true`、`POCKET_ALLOWED_GITHUB_IDS=["自分の数値ID"]`、`AUTH_GITHUB_CLIENT_ID`、`AUTH_GITHUB_CLIENT_SECRET`を書きます。`.env`はコミットしません。
+3. `npm run db:migrate`、`npm run build`、`npm run preview`の順に実行します。
+4. MCPクライアントに`http://127.0.0.1:4173/mcp`を登録します。
+
+`npm run dev`は認証を通さない開発モードなので、OAuthは動きません。
+
 ## 公開しないための境界
 
-開発ビルドはloopbackからだけAPI/MCPを受け付けます。本番では認証が既定で無効になっており、API/MCPへの要求を503で拒否します。認証を有効にしたあとはセッションまたは失効可能なBearerトークンが必要で、全操作をユーザー別に分離します。MCP OAuth discoveryは提供せず、手動設定したBearerヘッダーで接続します。異なるOriginやcross-site要求は拒否し、本文の上限8KiB（写真の送信のみ2.5MB）・入力スキーマ・DB制約・パラメータ化SQLで検証します。
+開発ビルドはloopbackからだけAPI/MCPを受け付けます。本番では認証が既定で無効になっており、API/MCPへの要求を503で拒否します。認証を有効にしたあとはセッションまたは失効可能なBearerトークンが必要で、全操作をユーザー別に分離します。MCPはOAuthでも接続でき、手動設定したBearerトークンも引き続き使えます。異なるOriginやcross-site要求は拒否し、本文の上限8KiB（写真の送信のみ2.5MB）・入力スキーマ・DB制約・パラメータ化SQLで検証します。
 
 同じマシンのプロセスはローカルデータを操作できます。localhost制限は認証の代わりではありません。公開前には認証設定・レート制限・バックアップなど運用を確認してください。本番のログインと公開URLでの動作は未検証です。
 

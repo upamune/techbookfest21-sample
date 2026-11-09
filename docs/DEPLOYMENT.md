@@ -39,9 +39,21 @@ npm run pocket -- call things_add_item '{"requestId":"生成したUUID","name":"
 
 CLIはURLとトークン両方が指定された場合のみremoteに接続します。HTTPS、正確な `/mcp`、userinfo・query・fragmentなしが必須です。リダイレクトと自動再接続を拒否し、書込みを自動再送しません。標準MCPクライアントでは同じURLに `Authorization: Bearer <token>` を設定します。HTTP APIも同じBearerヘッダーを使用します。トークンをURLへ入れないでください。
 
+## MCP OAuth
+
+`POCKET_AUTH_ENABLED=true`にすると、CIMDとDynamic Client Registrationが有効になります。`false`の間はどちらも拒否し、外部への取得もしません。
+
+- `/.well-known/oauth-protected-resource/mcp`と`/.well-known/oauth-authorization-server/api/auth`を公開します。
+- アクセストークンはEdDSA署名のJWTで、有効期限は1時間です。aud が`<公開先>/mcp`、scope に`mcp:tools`を含むものだけを受け付け、毎回許可表と照合します。REST APIには使えません。
+- 公開先の`resource`はHTTPS必須です。HTTPはloopbackでだけ動きます。
+- CIMD文書の取得はCloudflare Workersの`fetch`で行い、接続先IPの固定はできません。`POCKET_CIMD_ALLOWED_HOSTS`の完全一致とリダイレクト拒否で、取得先を信頼できるホストに限定しています。このリストを任意のホストへ広げないでください。
+- DCRは認証なしで登録できます。登録された名前は自己申告なので、同意画面では「未確認」と表示します。
+- DPoPで拘束されたトークンには未対応で、401を返します。
+
 ## 公開後の受け入れ確認
 
 - 未認証API/MCPが401、gate無効時は503になる。
+- 未認証の`/mcp`が`WWW-Authenticate`を返し、許可したクライアントだけがOAuthで接続できる。
 - 2アカウントで一覧・更新・削除が交差せず、推測した他人のUUIDでも操作できない。
 - Web作成をAPI/MCP/CLIから確認でき、逆方向も同じデータになる。
 - token失効・期限切れ・アカウント削除後に401になる。

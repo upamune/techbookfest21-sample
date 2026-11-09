@@ -624,6 +624,27 @@
   font-size: 1.5rem;
   font-weight: 650;
 }
+.oauth-consent-skeleton {
+  display: block;
+  height: 1lh;
+}
+.oauth-consent-facts {
+  display: grid;
+  gap: 0.625rem;
+  padding-block: 0.25rem;
+}
+.oauth-consent-facts dt {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+.oauth-consent-facts dd {
+  overflow-wrap: anywhere;
+}
+.oauth-consent-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
 @media (hover: hover) and (pointer: fine) {
   .portal-card:hover {
     background: #fafafa;
@@ -645,6 +666,12 @@
   }
   .app-frame {
     padding-inline-start: var(--sidebar-width);
+  }
+  .app-frame:has(.oauth-consent) {
+    padding-inline-start: 0;
+  }
+  body:has(.oauth-consent) .app-sidebar {
+    display: none;
   }
   .app-sidebar {
     position: fixed;

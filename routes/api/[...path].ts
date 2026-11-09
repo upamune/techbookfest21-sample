@@ -6,16 +6,23 @@ import { storage } from "void/storage";
 import { createApi } from "../../src/http/api";
 import { resolveAccessToken } from "../../src/security/access-tokens";
 import { allowedOwner } from "../../src/security/allowed-owner";
+import { isMcpPath, resolveMcpOAuthOwner } from "../../src/security/mcp-oauth";
+import { voidAuthHandler } from "../../src/security/void-auth";
 
 const app = createApi(import.meta.env.DEV);
+
+async function bearerOwner(context: Parameters<Parameters<typeof defineHandler>[0]>[0]) {
+  const request = context.req.raw;
+  const tokenOwner = await resolveAccessToken(context.env.DB, request);
+  if (tokenOwner !== null || !isMcpPath(new URL(request.url).pathname)) return tokenOwner;
+  return resolveMcpOAuthOwner({ request, authHandler: voidAuthHandler(context) });
+}
+
 const handler = defineHandler(async (context) => {
   const user = getUser();
   const sessionOwner = user ? `user:${user.id}` : undefined;
   const hasBearer = context.req.raw.headers.has("authorization");
-  const tokenOwner =
-    hasBearer && env.POCKET_AUTH_ENABLED
-      ? await resolveAccessToken(context.env.DB, context.req.raw)
-      : null;
+  const tokenOwner = hasBearer && env.POCKET_AUTH_ENABLED ? await bearerOwner(context) : null;
   const principal = hasBearer ? (tokenOwner ?? undefined) : sessionOwner;
   const permittedOwner = env.POCKET_AUTH_ENABLED
     ? await allowedOwner({

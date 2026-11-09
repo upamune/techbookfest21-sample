@@ -111,6 +111,19 @@ describe("authenticated production boundary", () => {
     expect(response.status).toBe(401);
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
+  it("challenges only MCP requests with protected resource metadata", async () => {
+    const mcp = await createApi(false).request(
+      "https://pocket.example/mcp",
+      { method: "POST" },
+      { POCKET_AUTH_ENABLED: true },
+    );
+    expect(mcp.status).toBe(401);
+    expect(mcp.headers.get("www-authenticate")).toContain(
+      'resource_metadata="https://pocket.example/.well-known/oauth-protected-resource/mcp"',
+    );
+    const rest = await createApi(false).request(endpoint, {}, { POCKET_AUTH_ENABLED: true });
+    expect(rest.headers.get("www-authenticate")).toBeNull();
+  });
   it("does not trust client-supplied owner headers", async () => {
     const response = await createApi(false).request(
       endpoint,

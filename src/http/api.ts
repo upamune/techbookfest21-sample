@@ -14,6 +14,7 @@ import { bindAppTools } from "../app-tools";
 import { handleMcp } from "../mcp/server";
 import { boundedRequest } from "../security/bounded-request";
 import { localAccessError } from "../security/local-access";
+import { isMcpPath, mcpChallenge } from "../security/mcp-oauth";
 import { registerTokenRoutes } from "./tokens";
 
 const defaultBodyLimit = 8192;
@@ -57,8 +58,11 @@ export function createApi(development: boolean) {
       return context.json({ error: "Authenticated access is not enabled." }, 503);
     const error = localAccessError(context.req.raw, development, !development);
     if (error !== null) return context.json({ error }, 403);
-    if (!development && !context.env.OWNER)
+    if (!development && !context.env.OWNER) {
+      const { origin, pathname } = new URL(context.req.url);
+      if (isMcpPath(pathname)) context.header("WWW-Authenticate", mcpChallenge(origin));
       return context.json({ error: "Sign in required." }, 401);
+    }
     context.req.raw = await boundedRequest(context.req.raw, bodyLimit(context.req.raw));
     await next();
   });

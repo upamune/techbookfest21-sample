@@ -42,9 +42,10 @@ describe("Google immutable subject allowlist", () => {
       }),
     ).toThrow("not permitted");
   });
-  it("keeps Google disabled if settings are incomplete or gate is closed", () => {
+  it("keeps Google disabled if credentials or the allowlist are missing", () => {
     expect(
-      options({ POCKET_AUTH_ENABLED: true, AUTH_GOOGLE_CLIENT_ID: "test" }).socialProviders,
+      options({ AUTH_GOOGLE_CLIENT_ID: "test", POCKET_ALLOWED_GOOGLE_SUBS: '["42"]' })
+        .socialProviders,
     ).toEqual({});
     expect(
       options({ AUTH_GOOGLE_CLIENT_ID: "test", AUTH_GOOGLE_CLIENT_SECRET: "fixture" })
@@ -53,12 +54,12 @@ describe("Google immutable subject allowlist", () => {
   });
   it("enables both providers independently without extra scopes", async () => {
     const configured = options({
-      POCKET_AUTH_ENABLED: true,
       AUTH_GOOGLE_CLIENT_ID: "test-google",
       AUTH_GOOGLE_CLIENT_SECRET: "fixture",
       AUTH_GITHUB_CLIENT_ID: "test-github",
       AUTH_GITHUB_CLIENT_SECRET: "fixture",
       POCKET_ALLOWED_GOOGLE_SUBS: '["42"]',
+      POCKET_ALLOWED_GITHUB_IDS: '["1"]',
     });
     expect(Object.keys(configured.socialProviders).sort()).toEqual(["github", "google"]);
     expect(configured.socialProviders.google).not.toHaveProperty("scope");

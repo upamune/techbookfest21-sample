@@ -1,7 +1,6 @@
 import { Link } from "@void/react";
 import { ChevronRight } from "lucide-react";
 import { AppBar } from "@pocket/ui/app-bar";
-import { AccountPanel } from "@/account/auth-gate";
 import { appCatalog } from "@/app-catalog";
 
 export default function PortalPage() {
@@ -25,7 +24,6 @@ export default function PortalPage() {
             </li>
           ))}
         </ul>
-        <AccountPanel />
       </main>
     </>
   );

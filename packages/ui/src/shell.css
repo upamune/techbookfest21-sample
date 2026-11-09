@@ -592,28 +592,109 @@
   height: 1.25rem;
   color: var(--muted-foreground);
 }
-.account-panel {
+.avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  user-select: none;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.settings-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1rem;
+}
+.settings {
   display: grid;
-  gap: 0.75rem;
-  margin-top: 2rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.875rem;
-  line-height: 1.7;
+  gap: 2.5rem;
+  padding-block: 1rem 2rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
   overflow-wrap: anywhere;
 }
-.account-row {
+.settings-section {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.settings-section h2 {
+  font-size: 1rem;
+  font-weight: 650;
+}
+.settings-note {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+.settings-group {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+}
+.settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
+  min-height: 4.25rem;
+  padding: 0.625rem 0.5rem 0.625rem 1rem;
+}
+.settings-row + .settings-row {
+  border-top: 1px solid var(--border);
+}
+.settings-row-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.settings-row-title,
+.settings-row-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-row-detail,
+.settings-empty {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+.token-form {
+  display: grid;
+  gap: 0.375rem;
+}
+.token-form label {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.token-form-controls {
+  display: grid;
   gap: 0.75rem;
 }
-.token-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.token-secret {
+  display: grid;
   gap: 0.75rem;
-  padding-block: 0.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  background: var(--muted);
+  font-size: 0.875rem;
+}
+@media (min-width: 40rem) {
+  .token-form-controls {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
 }
 .signin {
   display: grid;
@@ -672,6 +753,23 @@
   }
   body:has(.oauth-consent) .app-sidebar {
     display: none;
+  }
+  .app-sidebar .nav-settings {
+    margin-top: auto;
+  }
+  .app-sidebar .sidebar-account {
+    margin-top: auto;
+    color: var(--foreground);
+  }
+  .app-sidebar .sidebar-account + .nav-settings {
+    margin-top: 0;
+  }
+  .sidebar-account .avatar {
+    margin-inline: -0.125rem;
+  }
+  .sidebar-account-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .app-sidebar {
     position: fixed;
@@ -737,7 +835,7 @@
     display: none;
   }
   .app-bar-title,
-  :root[data-sidebar="collapsed"] .sidebar-item span {
+  :root[data-sidebar="collapsed"] .sidebar-item > span:not(.avatar) {
     position: absolute;
     flex: none;
     width: 1px;

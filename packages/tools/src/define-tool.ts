@@ -11,6 +11,10 @@ export class ToolConflictError extends Error {
   override readonly name = "ToolConflictError";
 }
 
+export class ToolRejectedError extends Error {
+  override readonly name: string = "ToolRejectedError";
+}
+
 type ToolSpec<Shape extends z.ZodRawShape> = {
   name: string;
   label: string;
@@ -18,6 +22,7 @@ type ToolSpec<Shape extends z.ZodRawShape> = {
   description: string;
   effect: ToolEffect;
   idempotent: boolean;
+  openWorld?: boolean;
   input: Shape;
 };
 
@@ -31,6 +36,8 @@ export type BoundTool = ToolSpec<z.ZodRawShape> & {
 
 export type ToolEnvironment = {
   binding: D1Database;
+  storage: R2Bucket;
+  images?: ImagesBinding;
   ownerId: string;
   caller: ToolCaller;
 };

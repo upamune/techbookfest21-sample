@@ -9,30 +9,61 @@ import {
 } from "react";
 import { auth } from "void/client";
 import { forgetLoadedResults } from "@pocket/tools/use-tool-query";
+import { Avatar } from "@pocket/ui/avatar";
 import { Button } from "@pocket/ui/button";
 import { ErrorNotice } from "@pocket/ui/feedback";
 import { Skeleton } from "@pocket/ui/skeleton";
 import { oauthAuthClient } from "./oauth-client";
+import { OAuthConnectionsPanel } from "./oauth-connections-panel";
 import { TokenPanel } from "./token-panel";
 
-type Account = { email: string; busy: boolean; error: string | null; signOut: () => void };
+type Account = {
+  name: string;
+  image: string | null;
+  email: string;
+  busy: boolean;
+  error: string | null;
+  signOut: () => void;
+};
 
 const AccountContext = createContext<Account | null>(null);
 
-export function AccountPanel() {
+export function SidebarAccount() {
   const account = use(AccountContext);
   if (account === null) return null;
   return (
-    <section className="account-panel" aria-label="アカウント">
-      <div className="account-row">
-        <span>{account.email}</span>
-        <Button variant="outline" disabled={account.busy} onClick={account.signOut}>
-          ログアウト
-        </Button>
-      </div>
-      {account.error && <ErrorNotice message={account.error} />}
+    <div className="sidebar-item sidebar-account">
+      <Avatar name={account.name} image={account.image} />
+      <span className="sidebar-account-name">{account.name}</span>
+    </div>
+  );
+}
+
+export function AccountSettings() {
+  const account = use(AccountContext);
+  if (account === null)
+    return <p className="settings-note">開発モードではログインしないので、設定はありません。</p>;
+  return (
+    <>
+      <section className="settings-section" aria-label="アカウント">
+        <h2>アカウント</h2>
+        <div className="settings-group">
+          <div className="settings-row">
+            <Avatar className="settings-avatar" name={account.name} image={account.image} />
+            <span className="settings-row-text">
+              <span className="settings-row-title">{account.name}</span>
+              <span className="settings-row-detail">{account.email}</span>
+            </span>
+            <Button variant="outline" disabled={account.busy} onClick={account.signOut}>
+              ログアウト
+            </Button>
+          </div>
+        </div>
+        {account.error && <ErrorNotice message={account.error} />}
+      </section>
+      <OAuthConnectionsPanel />
       <TokenPanel />
-    </section>
+    </>
   );
 }
 
@@ -95,6 +126,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     <AccountContext
       key={session.data.user.id}
       value={{
+        name: session.data.user.name,
+        image: session.data.user.image ?? null,
         email: session.data.user.email,
         busy,
         error,

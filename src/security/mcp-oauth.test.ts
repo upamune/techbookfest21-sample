@@ -42,6 +42,8 @@ async function signer() {
   };
 }
 
+const hasConsent = async () => true;
+
 function mcpRequest(token: string) {
   return new Request(audience, {
     method: "POST",
@@ -53,7 +55,9 @@ describe("MCP OAuth access tokens", () => {
   it("maps a token bound to this resource to its owner", async () => {
     const { authHandler, sign } = await signer();
     const request = mcpRequest(await sign({}));
-    await expect(resolveMcpOAuthOwner({ request, authHandler })).resolves.toBe("user:alice");
+    await expect(resolveMcpOAuthOwner({ request, authHandler, hasConsent })).resolves.toBe(
+      "user:alice",
+    );
   });
 
   it.each([
@@ -66,17 +70,32 @@ describe("MCP OAuth access tokens", () => {
   ])("rejects %s", async (_label, options) => {
     const { authHandler, sign } = await signer();
     const request = mcpRequest(await sign(options));
-    await expect(resolveMcpOAuthOwner({ request, authHandler })).resolves.toBeNull();
+    await expect(resolveMcpOAuthOwner({ request, authHandler, hasConsent })).resolves.toBeNull();
+  });
+
+  it("rejects a valid token once the connection has been revoked", async () => {
+    const { authHandler, sign } = await signer();
+    const consentChecks: unknown[] = [];
+    const owner = await resolveMcpOAuthOwner({
+      request: mcpRequest(await sign({})),
+      authHandler,
+      hasConsent: async (consent) => {
+        consentChecks.push(consent);
+        return false;
+      },
+    });
+    expect(owner).toBeNull();
+    expect(consentChecks).toEqual([{ userId: "alice", clientId: "client" }]);
   });
 
   it("rejects a token signed by another key and a value that is not a JWT", async () => {
     const { authHandler } = await signer();
     const { sign } = await signer();
     await expect(
-      resolveMcpOAuthOwner({ request: mcpRequest(await sign({})), authHandler }),
+      resolveMcpOAuthOwner({ request: mcpRequest(await sign({})), authHandler, hasConsent }),
     ).resolves.toBeNull();
     await expect(
-      resolveMcpOAuthOwner({ request: mcpRequest("not-a-jwt"), authHandler }),
+      resolveMcpOAuthOwner({ request: mcpRequest("not-a-jwt"), authHandler, hasConsent }),
     ).resolves.toBeNull();
   });
 
@@ -87,6 +106,7 @@ describe("MCP OAuth access tokens", () => {
       resolveMcpOAuthOwner({
         request: mcpRequest(await sign({})),
         authHandler: () => Promise.reject(failure),
+        hasConsent,
       }),
     ).rejects.toBe(failure);
   });

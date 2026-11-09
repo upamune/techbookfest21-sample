@@ -1,12 +1,13 @@
 import type { Hono } from "hono";
+import { createMiddleware } from "hono/factory";
 import { z } from "zod";
 import { createTokenService, tokenNameInput } from "../security/access-tokens";
 import type { Bindings } from "./api";
 
-export function registerTokenRoutes(app: Hono<{ Bindings: Bindings }>) {
-  app.use("/api/tokens/*", async (context, next) => {
-    if (context.env?.POCKET_AUTH_ENABLED !== true || !context.env.SESSION_OWNER)
-      return context.json({ error: "A browser sign-in is required to manage tokens." }, 401);
+export const requireBrowserSession = createMiddleware<{ Bindings: Bindings }>(
+  async (context, next) => {
+    if (context.env?.AUTH_CONFIGURED !== true || !context.env.SESSION_OWNER)
+      return context.json({ error: "A browser sign-in is required to manage access." }, 401);
     if (
       context.req.method !== "GET" &&
       context.req.header("origin") !== new URL(context.req.url).origin
@@ -18,7 +19,11 @@ export function registerTokenRoutes(app: Hono<{ Bindings: Bindings }>) {
     )
       return context.json({ error: "Expected application/json." }, 415);
     await next();
-  });
+  },
+);
+
+export function registerTokenRoutes(app: Hono<{ Bindings: Bindings }>) {
+  app.use("/api/tokens/*", requireBrowserSession);
   app.get("/api/tokens", async (context) => {
     const service = createTokenService(context.env.DB, context.env.SESSION_OWNER ?? "");
     return context.json({ tokens: await service.list() });

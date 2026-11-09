@@ -37,6 +37,7 @@ describe("real D1 owner isolation", () => {
             env: {
               DB: { type: "d1", id: "isolation-test" },
               STORAGE: { type: "r2", name: "isolation-test" },
+              IMAGES: { type: "images" },
             },
           },
         },
@@ -45,6 +46,7 @@ describe("real D1 owner isolation", () => {
     try {
       const DB = await runtime.getD1Database("DB");
       const STORAGE = await runtime.getR2Bucket("STORAGE");
+      const { IMAGES } = await runtime.getBindings<{ IMAGES: ImagesBinding }>();
       for (const file of (await readdir("db/migrations"))
         .filter((name) => name.endsWith(".sql"))
         .sort()) {
@@ -108,9 +110,10 @@ describe("real D1 owner isolation", () => {
           googleSubs: '["123"]',
         }),
       ).toBe("user:b");
-      const owner = { DB, STORAGE, POCKET_AUTH_ENABLED: true, OWNER: "user:a" };
+      const owner = { DB, STORAGE, IMAGES, AUTH_CONFIGURED: true, OWNER: "user:a" };
       const other = { ...owner, OWNER: "user:b" };
-      const call = (name: string, input: object, environment: typeof owner) =>
+      type TestEnvironment = Omit<typeof owner, "IMAGES"> & { IMAGES?: ImagesBinding };
+      const call = (name: string, input: object, environment: TestEnvironment) =>
         app.request(
           `https://pocket.example/api/tools/${name}`,
           {
@@ -128,7 +131,7 @@ describe("real D1 owner isolation", () => {
       expect(thread.authorKind).toBe("human");
       const replayed = await call("forum_create_thread", threadInput, owner);
       expect(threadOutput.parse(await replayed.json()).thread).toEqual(thread);
-      const listFor = async (environment: typeof owner) =>
+      const listFor = async (environment: TestEnvironment) =>
         threadListOutput.parse(await (await call("forum_list_threads", {}, environment)).json())
           .threads;
       expect(await listFor(owner)).toHaveLength(1);
@@ -172,7 +175,7 @@ describe("real D1 owner isolation", () => {
       await call("forum_set_thread_archived", { id: thread.id, archived: false }, owner);
       expect(await listFor(owner)).toHaveLength(1);
 
-      const activityFor = async (input: object, environment: typeof owner = owner) =>
+      const activityFor = async (input: object, environment: TestEnvironment = owner) =>
         recentActivityOutput.parse(
           await (await call("forum_list_recent_activity", input, environment)).json(),
         );
@@ -217,7 +220,7 @@ describe("real D1 owner isolation", () => {
         await (await call("things_add_item", itemInput, owner)).json(),
       );
       await call("things_add_item", itemInput, owner);
-      const search = async (query: string, environment: typeof owner) =>
+      const search = async (query: string, environment: TestEnvironment) =>
         itemListOutput.parse(
           await (await call("things_search_items", { query }, environment)).json(),
         ).items;
@@ -248,7 +251,7 @@ describe("real D1 owner isolation", () => {
         form.set("thumb", new File([jpeg], "thumb.jpg", { type: "image/jpeg" }));
         return form;
       };
-      const upload = (form: FormData, environment: typeof owner) =>
+      const upload = (form: FormData, environment: TestEnvironment) =>
         app.request(
           "https://pocket.example/api/things/photos",
           { method: "POST", body: form },
@@ -277,6 +280,38 @@ describe("real D1 owner isolation", () => {
       await call("things_set_photo_deleted", { id: photo.id, deleted: true }, owner);
       expect((await app.request(`${photos}/${photo.id}/thumb`, {}, owner)).status).toBe(404);
       expect((await search("", owner))[0]?.photos).toEqual([]);
+
+      const onePixelPng =
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+      const addPhoto = (requestId: string, data: string, environment: TestEnvironment = owner) =>
+        call(
+          "things_add_photo",
+          { requestId, itemId: item.id, source: { kind: "base64", data } },
+          environment,
+        );
+      const photoRequestId = crypto.randomUUID();
+      const added = await addPhoto(photoRequestId, onePixelPng);
+      expect(added.status).toBe(200);
+      const { photo: converted } = photoOutput.parse(await added.json());
+      expect(converted).toMatchObject({ id: photoRequestId, width: 1, height: 1 });
+      const stored = await app.request(`${photos}/${converted.id}/full`, {}, owner);
+      expect(stored.headers.get("content-type")).toBe("image/jpeg");
+      expect([...new Uint8Array(await stored.arrayBuffer()).slice(0, 3)]).toEqual([
+        0xff, 0xd8, 0xff,
+      ]);
+      expect((await app.request(`${photos}/${converted.id}/thumb`, {}, owner)).status).toBe(200);
+      expect(photoOutput.parse(await (await addPhoto(photoRequestId, onePixelPng)).json())).toEqual(
+        {
+          photo: converted,
+        },
+      );
+      expect((await search("", owner))[0]?.photos).toEqual([converted]);
+      expect((await addPhoto(crypto.randomUUID(), onePixelPng, other)).status).toBe(404);
+      expect((await addPhoto(crypto.randomUUID(), "AQID")).status).toBe(422);
+      expect(
+        (await addPhoto(crypto.randomUUID(), onePixelPng, { ...owner, IMAGES: undefined })).status,
+      ).toBe(422);
+      await call("things_set_photo_deleted", { id: converted.id, deleted: true }, owner);
 
       const tokens = createTokenService(DB, "user:a");
       const issued = await tokens.issue({ name: "test" });

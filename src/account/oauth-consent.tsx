@@ -3,7 +3,7 @@ import { Button } from "@pocket/ui/button";
 import { ErrorNotice } from "@pocket/ui/feedback";
 import { Skeleton } from "@pocket/ui/skeleton";
 import { z } from "zod";
-import { oauthAuthClient } from "./oauth-client";
+import { clientPublisher, hostOf, oauthAuthClient } from "./oauth-client";
 
 const publicClient = z.object({ client_id: z.string(), client_name: z.string().optional() });
 const consentResult = z.object({ url: z.string() });
@@ -17,12 +17,8 @@ const invalidRequest: View = {
   message: "接続の要求が無効か、期限が切れています。接続元のアプリからやり直してください。",
 };
 
-function hostOf(value: string) {
-  return URL.canParse(value) ? new URL(value).host : null;
-}
-
 function toClient(client: z.infer<typeof publicClient>, redirectUri: string): Client {
-  const publisher = client.client_id.startsWith("https://") ? hostOf(client.client_id) : null;
+  const publisher = clientPublisher(client.client_id);
   return {
     name: client.client_name ?? publisher ?? "名前のないアプリ",
     publisher,

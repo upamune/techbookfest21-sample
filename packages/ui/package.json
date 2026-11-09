@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./avatar": "./src/primitives/avatar.tsx",
     "./button": "./src/primitives/button.tsx",
     "./input": "./src/primitives/input.tsx",
     "./textarea": "./src/primitives/textarea.tsx",

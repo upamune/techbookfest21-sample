@@ -10,6 +10,7 @@ const defaultCimdHosts = '["claude.ai","chatgpt.com","openai.com"]';
 const jsonWebKeySet = z.object({ keys: z.array(z.looseObject({ kty: z.string() })) });
 const accessTokenClaims = z.object({
   sub: z.string().min(1),
+  azp: z.string().min(1),
   scope: z.string().default(""),
   cnf: z.object({ jkt: z.string() }).optional(),
 });
@@ -34,9 +35,11 @@ function isCredentialRejection(cause: unknown) {
 export async function resolveMcpOAuthOwner({
   request,
   authHandler,
+  hasConsent,
 }: {
   request: Request;
   authHandler: AuthHandler;
+  hasConsent: (consent: { userId: string; clientId: string }) => Promise<boolean>;
 }) {
   const header = request.headers.get("authorization");
   if (header === null || !header.startsWith("Bearer ")) return null;
@@ -57,7 +60,8 @@ export async function resolveMcpOAuthOwner({
     });
     const claims = accessTokenClaims.parse(verified);
     if (claims.cnf !== undefined || !claims.scope.split(" ").includes(mcpToolsScope)) return null;
-    return `user:${claims.sub}`;
+    const consented = await hasConsent({ userId: claims.sub, clientId: claims.azp });
+    return consented ? `user:${claims.sub}` : null;
   } catch (cause) {
     if (isCredentialRejection(cause) || cause instanceof z.ZodError) return null;
     throw cause;

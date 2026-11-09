@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { crossfade } from "@pocket/tools/crossfade";
 import { Button } from "@pocket/ui/button";
+import { SidebarAccount } from "@/account/auth-gate";
 import { AppNavLinks } from "@/app-nav";
 
 const storageKey = "pocket-sidebar";
@@ -47,7 +48,7 @@ export function AppSidebar() {
         <PanelLeftClose className="sidebar-icon-close" aria-hidden="true" />
         <PanelLeftOpen className="sidebar-icon-open" aria-hidden="true" />
       </Button>
-      <AppNavLinks className="sidebar-item" />
+      <AppNavLinks className="sidebar-item" beforeSettings={<SidebarAccount />} />
     </nav>
   );
 }

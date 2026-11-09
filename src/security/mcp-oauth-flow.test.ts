@@ -11,6 +11,11 @@ const resource = `${origin}/mcp`;
 const clientId = "https://client.example/metadata.json";
 const redirectUri = "https://client.example/callback";
 const verifier = "e2e-verifier-e2e-verifier-e2e-verifier-e2e-verifier";
+const signInConfigured = {
+  AUTH_GITHUB_CLIENT_ID: "test-client",
+  AUTH_GITHUB_CLIENT_SECRET: "test-fixture",
+  POCKET_ALLOWED_GITHUB_IDS: '["1"]',
+};
 
 function createAuth(env: Record<string, unknown>) {
   const tables = [
@@ -65,12 +70,16 @@ async function codeChallenge() {
     .replaceAll("=", "");
 }
 
-async function authorize(auth: ReturnType<typeof createAuth>, cookie: string) {
+async function authorize(
+  auth: ReturnType<typeof createAuth>,
+  cookie: string,
+  scope = "mcp:tools offline_access",
+) {
   const query = new URLSearchParams({
     response_type: "code",
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope: "mcp:tools offline_access",
+    scope,
     state: "state-value",
     code_challenge: await codeChallenge(),
     code_challenge_method: "S256",
@@ -103,63 +112,67 @@ describe("OAuth with a Client ID Metadata Document", () => {
     vi.restoreAllMocks();
   });
 
-  it("issues a token the MCP endpoint accepts for an allowed client host", async () => {
-    const fetchMock = stubClientDocument();
-    const auth = createAuth({
-      POCKET_AUTH_ENABLED: true,
-      POCKET_CIMD_ALLOWED_HOSTS: '["client.example"]',
-    });
-    const cookie = await signIn(auth);
+  it.each(["mcp:tools offline_access", "openid mcp:tools offline_access"])(
+    "issues a token the MCP endpoint accepts for scope %s",
+    async (scope) => {
+      const fetchMock = stubClientDocument();
+      const auth = createAuth({
+        ...signInConfigured,
+        POCKET_CIMD_ALLOWED_HOSTS: '["client.example"]',
+      });
+      const cookie = await signIn(auth);
 
-    const consentPage = await authorize(auth, cookie);
-    expect(consentPage.status).toBe(302);
-    const consentLocation = consentPage.headers.get("location") ?? "";
-    expect(consentLocation).toMatch(/^\/oauth\/consent\?/u);
-    expect(fetchMock).toHaveBeenCalled();
+      const consentPage = await authorize(auth, cookie, scope);
+      expect(consentPage.status).toBe(302);
+      const consentLocation = consentPage.headers.get("location") ?? "";
+      expect(consentLocation).toMatch(/^\/oauth\/consent\?/u);
+      expect(fetchMock).toHaveBeenCalled();
 
-    const consent = await auth.handler(
-      new Request(`${issuer}/oauth2/consent`, {
-        method: "POST",
-        headers: { cookie, origin, "content-type": "application/json" },
-        body: JSON.stringify({ accept: true, oauth_query: consentLocation.split("?")[1] }),
-      }),
-    );
-    const { url } = z.object({ url: z.url() }).parse(await consent.json());
-    const code = new URL(url).searchParams.get("code") ?? "";
-
-    const token = await auth.handler(
-      new Request(`${issuer}/oauth2/token`, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          grant_type: "authorization_code",
-          code,
-          client_id: clientId,
-          redirect_uri: redirectUri,
-          code_verifier: verifier,
-          resource,
+      const consent = await auth.handler(
+        new Request(`${issuer}/oauth2/consent`, {
+          method: "POST",
+          headers: { cookie, origin, "content-type": "application/json" },
+          body: JSON.stringify({ accept: true, oauth_query: consentLocation.split("?")[1] }),
         }),
-      }),
-    );
-    const { access_token: accessToken } = z
-      .object({ access_token: z.string() })
-      .parse(await token.json());
+      );
+      const { url } = z.object({ url: z.url() }).parse(await consent.json());
+      const code = new URL(url).searchParams.get("code") ?? "";
 
-    const owner = await resolveMcpOAuthOwner({
-      request: new Request(resource, {
-        method: "POST",
-        headers: { authorization: `Bearer ${accessToken}` },
-      }),
-      authHandler: auth.handler,
-    });
-    expect(owner).toMatch(/^user:/u);
-  });
+      const token = await auth.handler(
+        new Request(`${issuer}/oauth2/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code,
+            client_id: clientId,
+            redirect_uri: redirectUri,
+            code_verifier: verifier,
+            resource,
+          }),
+        }),
+      );
+      const { access_token: accessToken } = z
+        .object({ access_token: z.string() })
+        .parse(await token.json());
+
+      const owner = await resolveMcpOAuthOwner({
+        request: new Request(resource, {
+          method: "POST",
+          headers: { authorization: `Bearer ${accessToken}` },
+        }),
+        authHandler: auth.handler,
+        hasConsent: async () => true,
+      });
+      expect(owner).toMatch(/^user:/u);
+    },
+  );
 
   it("does not fetch documents from hosts outside the allowlist", async () => {
     const fetchMock = stubClientDocument();
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const auth = createAuth({
-      POCKET_AUTH_ENABLED: true,
+      ...signInConfigured,
       POCKET_CIMD_ALLOWED_HOSTS: '["other.example"]',
     });
     const response = await authorize(auth, await signIn(auth));

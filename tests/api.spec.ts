@@ -17,6 +17,7 @@ const expectedTools = [
   "forum_set_reply_deleted",
   "forum_set_thread_archived",
   "things_add_item",
+  "things_add_photo",
   "things_list_options",
   "things_search_items",
   "things_set_item_deleted",
@@ -134,6 +135,8 @@ test("MCP tools advertise read and write effects", async () => {
     expect(hints("forum_list_threads")?.readOnlyHint).toBe(true);
     expect(hints("things_add_item")?.readOnlyHint).toBe(false);
     expect(hints("things_set_item_deleted")?.destructiveHint).toBe(true);
+    expect(hints("things_add_photo")?.openWorldHint).toBe(true);
+    expect(hints("things_add_item")?.openWorldHint).toBe(false);
   } finally {
     await client.close();
   }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import configureAuth from "../../auth";
+import { isAuthConfigured } from "./auth-config";
 
 function options(env: Parameters<typeof configureAuth>[0]["env"]) {
   return configureAuth({
@@ -11,31 +12,27 @@ function options(env: Parameters<typeof configureAuth>[0]["env"]) {
 }
 
 describe("GitHub OAuth configuration", () => {
+  const complete = {
+    AUTH_GITHUB_CLIENT_ID: "test-client",
+    AUTH_GITHUB_CLIENT_SECRET: "test-fixture",
+    POCKET_ALLOWED_GITHUB_IDS: '["1"]',
+  };
   it.each([
     {},
-    { POCKET_AUTH_ENABLED: true },
-    { POCKET_AUTH_ENABLED: true, AUTH_GITHUB_CLIENT_ID: "test-client" },
-    { POCKET_AUTH_ENABLED: true, AUTH_GITHUB_CLIENT_SECRET: "test-fixture" },
-    {
-      POCKET_AUTH_ENABLED: true,
-      AUTH_GITHUB_CLIENT_ID: " ",
-      AUTH_GITHUB_CLIENT_SECRET: "test-fixture",
-    },
-    {
-      POCKET_AUTH_ENABLED: false,
-      AUTH_GITHUB_CLIENT_ID: "test-client",
-      AUTH_GITHUB_CLIENT_SECRET: "test-fixture",
-    },
-  ])("fails closed without an enabled gate and both settings: %j", (env) => {
+    { ...complete, AUTH_GITHUB_CLIENT_ID: undefined },
+    { ...complete, AUTH_GITHUB_CLIENT_SECRET: undefined },
+    { ...complete, AUTH_GITHUB_CLIENT_ID: " " },
+    { ...complete, POCKET_ALLOWED_GITHUB_IDS: undefined },
+    { ...complete, POCKET_ALLOWED_GITHUB_IDS: "[]" },
+    { ...complete, POCKET_ALLOWED_GITHUB_IDS: "not json" },
+  ])("fails closed without credentials and an allowlist: %j", (env) => {
     expect(options(env).socialProviders).toEqual({});
     expect(options(env).emailAndPassword.enabled).toBe(false);
+    expect(isAuthConfigured(env)).toBe(false);
   });
-  it.each([true, "true"])("enables GitHub only with complete configuration (%s)", (enabled) => {
-    const configuration = options({
-      POCKET_AUTH_ENABLED: enabled,
-      AUTH_GITHUB_CLIENT_ID: "test-client",
-      AUTH_GITHUB_CLIENT_SECRET: "test-fixture",
-    });
+  it("enables GitHub once credentials and an allowlist are set", () => {
+    expect(isAuthConfigured(complete)).toBe(true);
+    const configuration = options(complete);
     expect(configuration.socialProviders).toEqual({
       github: {
         clientId: "test-client",

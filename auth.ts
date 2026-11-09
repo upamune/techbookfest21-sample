@@ -2,7 +2,7 @@ import { cimd } from "@better-auth/cimd";
 import { mcp } from "@better-auth/mcp";
 import { jwt } from "better-auth/plugins";
 import { defineAuth } from "void/auth";
-import { z } from "zod";
+import { configuredAuthProviders } from "./src/security/auth-config";
 import { authorizeGithubProfile, isAllowedGithubId } from "./src/security/github-allowlist";
 import { authorizeGoogleProfile, isAllowedGoogleSub } from "./src/security/google-allowlist";
 import {
@@ -13,23 +13,11 @@ import {
   parseCimdHosts,
 } from "./src/security/mcp-oauth";
 
-const providerCredentials = z.object({
-  clientId: z.string().trim().min(1),
-  clientSecret: z.string().trim().min(1),
-});
-
 const oauthPage = "/oauth/consent";
 
 export default defineAuth(({ defaults, env, request }) => {
-  const enabled = env.POCKET_AUTH_ENABLED === true || env.POCKET_AUTH_ENABLED === "true";
-  const github = providerCredentials.safeParse({
-    clientId: env.AUTH_GITHUB_CLIENT_ID,
-    clientSecret: env.AUTH_GITHUB_CLIENT_SECRET,
-  });
-  const google = providerCredentials.safeParse({
-    clientId: env.AUTH_GOOGLE_CLIENT_ID,
-    clientSecret: env.AUTH_GOOGLE_CLIENT_SECRET,
-  });
+  const { github, google } = configuredAuthProviders(env);
+  const enabled = github !== null || google !== null;
   const cimdHosts = parseCimdHosts(env.POCKET_CIMD_ALLOWED_HOSTS);
   return {
     ...defaults,
@@ -41,7 +29,7 @@ export default defineAuth(({ defaults, env, request }) => {
         consentPage: oauthPage,
         resource: mcpResource(new URL(request.url).origin),
         scopes: ["openid", "offline_access", mcpToolsScope],
-        clientRegistrationDefaultScopes: [mcpToolsScope, "offline_access"],
+        clientRegistrationDefaultScopes: ["openid", mcpToolsScope, "offline_access"],
         clientRegistrationDefaultApplicationType: "infer",
         allowDynamicClientRegistration: enabled,
         allowUnauthenticatedClientRegistration: enabled,
@@ -76,19 +64,19 @@ export default defineAuth(({ defaults, env, request }) => {
     },
     emailAndPassword: { enabled: false },
     socialProviders: {
-      ...(enabled && github.success
+      ...(github !== null
         ? {
             github: {
-              ...github.data,
+              ...github,
               mapProfileToUser: (profile: unknown) =>
                 authorizeGithubProfile({ allowlist: env.POCKET_ALLOWED_GITHUB_IDS, profile }),
             },
           }
         : {}),
-      ...(enabled && google.success
+      ...(google !== null
         ? {
             google: {
-              ...google.data,
+              ...google,
               mapProfileToUser: (profile: unknown) =>
                 authorizeGoogleProfile({ allowlist: env.POCKET_ALLOWED_GOOGLE_SUBS, profile }),
             },

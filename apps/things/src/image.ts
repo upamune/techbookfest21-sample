@@ -1,11 +1,6 @@
+import { photoLimits, photoRendering } from "./contracts";
+
 const unreadableImage = "この画像は読み込めませんでした。JPEGかPNGの写真を選んでください。";
-const fullMax = 1600;
-const fullQuality = 0.85;
-const fullTargetBytes = 1_500_000;
-const smallerFullMax = 1280;
-const smallerFullQuality = 0.7;
-const thumbMax = 480;
-const thumbQuality = 0.8;
 
 type Decoded = {
   source: CanvasImageSource;
@@ -75,12 +70,12 @@ function renderJpeg({ decoded, max, quality }: { decoded: Decoded; max: number; 
 export async function prepareImage(file: Blob) {
   const decoded = await decode(file);
   try {
-    const first = await renderJpeg({ decoded, max: fullMax, quality: fullQuality });
+    const first = await renderJpeg({ decoded, ...photoRendering.full });
     const full =
-      first.blob.size <= fullTargetBytes
+      first.blob.size <= photoLimits.fullTargetBytes
         ? first
-        : await renderJpeg({ decoded, max: smallerFullMax, quality: smallerFullQuality });
-    const thumb = await renderJpeg({ decoded, max: thumbMax, quality: thumbQuality });
+        : await renderJpeg({ decoded, ...photoRendering.smallerFull });
+    const thumb = await renderJpeg({ decoded, ...photoRendering.thumb });
     return { full, thumb: thumb.blob };
   } finally {
     decoded.release();

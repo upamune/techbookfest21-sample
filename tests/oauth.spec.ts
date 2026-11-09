@@ -174,8 +174,8 @@ test("a person approves a client on their phone and MCP accepts its token", asyn
     },
   });
   expect(tokenResponse.status()).toBe(200);
-  const { access_token: accessToken } = z
-    .object({ access_token: z.string() })
+  const { access_token: accessToken, refresh_token: refreshToken } = z
+    .object({ access_token: z.string(), refresh_token: z.string() })
     .parse(await tokenResponse.json());
 
   const allowed = await callTool(request, accessToken);
@@ -191,6 +191,56 @@ test("a person approves a client on their phone and MCP accepts its token", asyn
     data: {},
   });
   expect(rest.status()).toBe(401);
+
+  for (const path of ["**/api/oauth-connections", "**/api/tokens"]) {
+    await page.route(path, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await route.continue();
+    });
+  }
+  await page.goto("/settings");
+  const connections = page.getByRole("region", { name: "接続中のアプリ" });
+  const skeletonRow = connections.locator(".settings-row");
+  await expect(skeletonRow).toHaveCount(1);
+  const loadingRow = await skeletonRow.boundingBox();
+  const tokens = page.getByRole("region", { name: "API・MCPアクセストークン" });
+  const tokenRow = tokens.locator(".settings-row");
+  const loadingTokenRow = await tokenRow.boundingBox();
+  await expect(tokens.getByText("発行したトークンはありません。")).toBeVisible();
+  expect(await tokenRow.boundingBox()).toEqual(loadingTokenRow);
+  const disconnect = page.getByRole("button", { name: "E2E Client の接続を解除" });
+  await expect(disconnect).toBeVisible();
+  expect(await connections.locator(".settings-row").boundingBox()).toEqual(loadingRow);
+  expect((await disconnect.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+
+  const otherUser = await request.fetch(
+    `/api/oauth-connections?${new URLSearchParams({ clientId })}`,
+    {
+      method: "DELETE",
+      headers: {
+        origin: baseURL,
+        cookie: `better-auth.session_token=${sessionCookie().value}`,
+      },
+    },
+  );
+  expect(await otherUser.json()).toEqual({ revoked: false });
+  expect((await callTool(request, accessToken)).status()).toBe(200);
+
+  await disconnect.click();
+  await expect(page.getByText("接続中のアプリはありません。")).toBeVisible();
+  expect(await connections.locator(".settings-row").boundingBox()).toEqual(loadingRow);
+
+  const revoked = await callTool(request, accessToken);
+  expect(revoked.status()).toBe(401);
+  const refreshed = await request.post(`${issuer}/oauth2/token`, {
+    form: {
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: clientId,
+      resource,
+    },
+  });
+  expect(refreshed.ok()).toBe(false);
 });
 
 test("denying a client returns an error to it", async ({ page, context, request }) => {
@@ -214,6 +264,48 @@ test("signing in during authorization keeps the signed request", async ({ page, 
     .parse((await signIn).postDataJSON());
   expect(new URLSearchParams(body.oauth_query).get("client_id")).toBe(clientId);
   expect(new URLSearchParams(body.oauth_query).has("sig")).toBe(true);
+});
+
+test("the signed-in person appears next to settings", async ({ page, context }) => {
+  await context.addCookies([sessionCookie()]);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/settings");
+  await expect(
+    page.getByRole("region", { name: "アカウント" }).getByText("E2E", { exact: true }),
+  ).toBeVisible();
+  const sidebar = page.locator(".app-sidebar");
+  const name = await sidebar.getByText("E2E", { exact: true }).boundingBox();
+  const settings = await sidebar.getByRole("link", { name: "設定" }).boundingBox();
+  expect(settings?.y ?? 0).toBeGreaterThan(name?.y ?? 0);
+  expect((settings?.y ?? 0) - (name?.y ?? 0)).toBeLessThan(60);
+});
+
+test("revoking a token asks first and uses a red button", async ({ page, context }) => {
+  await context.addCookies([sessionCookie()]);
+  await page.goto("/settings");
+  const name = `e2e-${randomUUID()}`;
+  await page.getByLabel("用途").fill(name);
+  await page.getByRole("button", { name: "トークンを発行" }).click();
+  await expect(page.getByLabel("発行されたトークン")).toBeVisible();
+  const row = page.locator(".settings-row", { hasText: name });
+  const revoke = row.getByRole("button", { name: `${name} を失効` });
+  expect(await revoke.evaluate((button) => getComputedStyle(button).color)).toBe(
+    "rgb(180, 35, 24)",
+  );
+
+  await revoke.click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog.getByText(name)).toBeVisible();
+  const cancel = dialog.getByRole("button", { name: "キャンセル" });
+  await expect(cancel).toBeFocused();
+  expect((await cancel.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await cancel.click();
+  await expect(dialog).toBeHidden();
+  await expect(row).toContainText("有効");
+
+  await revoke.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "失効する" }).click();
+  await expect(row).toHaveCount(0);
 });
 
 test("the consent page refuses a request without a signature", async ({ page, context }) => {

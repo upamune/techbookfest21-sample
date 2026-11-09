@@ -7,14 +7,20 @@ import {
   respondToAskAi,
   type AskAiEnvironment,
 } from "@pocket/ask-ai/server";
-import { createPhotoStore, PhotoRejectedError } from "@pocket/things/server";
-import { ToolConflictError, ToolNotFoundError, type ToolCaller } from "@pocket/tools/define-tool";
+import { createPhotoStore } from "@pocket/things/server";
+import {
+  ToolConflictError,
+  ToolNotFoundError,
+  ToolRejectedError,
+  type ToolCaller,
+} from "@pocket/tools/define-tool";
 import { z } from "zod";
 import { bindAppTools } from "../app-tools";
 import { handleMcp } from "../mcp/server";
 import { boundedRequest } from "../security/bounded-request";
 import { localAccessError } from "../security/local-access";
 import { isMcpPath, mcpChallenge } from "../security/mcp-oauth";
+import { registerOAuthConnectionRoutes } from "./oauth-connections";
 import { registerTokenRoutes } from "./tokens";
 
 const defaultBodyLimit = 8192;
@@ -26,7 +32,7 @@ const askAiPath = "/api/ai/chat";
 function bodyLimit(request: Request) {
   if (request.method !== "POST") return defaultBodyLimit;
   const { pathname } = new URL(request.url);
-  if (pathname === photoCollectionPath) return photoBodyLimit;
+  if (pathname === photoCollectionPath || isMcpPath(pathname)) return photoBodyLimit;
   return pathname === askAiPath ? askAiBodyLimit : defaultBodyLimit;
 }
 
@@ -37,9 +43,10 @@ function mediaTypeOf(request: Request) {
 export type Bindings = {
   DB: D1Database;
   STORAGE: R2Bucket;
+  IMAGES?: ImagesBinding;
   OWNER?: string;
   SESSION_OWNER?: string;
-  POCKET_AUTH_ENABLED?: boolean;
+  AUTH_CONFIGURED?: boolean;
   ASK_AI?: AskAiEnvironment;
 };
 
@@ -48,13 +55,15 @@ export function createApi(development: boolean) {
   const toolsFor = (env: Bindings, caller: ToolCaller) =>
     bindAppTools({
       binding: env.DB,
+      storage: env.STORAGE,
+      images: env.IMAGES,
       ownerId: development ? "local" : (env.OWNER ?? ""),
       caller,
     });
   app.use("*", secureHeaders());
   app.use("*", async (context, next) => {
     context.header("Cache-Control", "no-store");
-    if (!development && context.env?.POCKET_AUTH_ENABLED !== true)
+    if (!development && context.env?.AUTH_CONFIGURED !== true)
       return context.json({ error: "Authenticated access is not enabled." }, 503);
     const error = localAccessError(context.req.raw, development, !development);
     if (error !== null) return context.json({ error }, 403);
@@ -67,6 +76,7 @@ export function createApi(development: boolean) {
     await next();
   });
   registerTokenRoutes(app);
+  registerOAuthConnectionRoutes(app);
   app.get("/api/access", (context) => context.json({ allowed: true }));
   app.post("/api/tools/:name", async (context) => {
     if (mediaTypeOf(context.req.raw) !== "application/json")
@@ -112,7 +122,7 @@ export function createApi(development: boolean) {
   app.onError((error, context) => {
     if (error instanceof ToolNotFoundError) return context.json({ error: error.message }, 404);
     if (error instanceof ToolConflictError) return context.json({ error: error.message }, 409);
-    if (error instanceof PhotoRejectedError) return context.json({ error: error.message }, 422);
+    if (error instanceof ToolRejectedError) return context.json({ error: error.message }, 422);
     if (error instanceof AskAiBadRequestError) return context.json({ error: error.message }, 400);
     if (error instanceof AskAiUnavailableError) return context.json({ error: error.message }, 503);
     if (error instanceof z.ZodError) return context.json({ error: "Invalid input." }, 400);

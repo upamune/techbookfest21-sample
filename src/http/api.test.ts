@@ -70,6 +70,24 @@ describe("HTTP boundary before database access", () => {
     });
     expect(response.status).toBe(413);
   });
+  it.each([
+    [100_000, false],
+    [2_500_001, true],
+  ])("limits an MCP body of %i bytes to the photo size", async (size, rejected) => {
+    const response = await createApi(true).request(
+      "http://localhost/mcp",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body: "x".repeat(size),
+      },
+      noBindings,
+    );
+    expect(response.status === 413).toBe(rejected);
+  });
   it.each(["/mcp", "/api/mcp"])("fails closed for %s in production", async (path) => {
     const response = await createApi(false).request(`http://localhost${path}`, { method: "POST" });
     expect(response.status).toBe(503);
@@ -90,7 +108,7 @@ describe("authenticated production boundary", () => {
         headers: { origin: "https://pocket.example", "content-type": "application/json" },
         body: '{"name":"forbidden"}',
       },
-      { POCKET_AUTH_ENABLED: true, OWNER: "user:test" },
+      { AUTH_CONFIGURED: true, OWNER: "user:test" },
     );
     expect(response.status).toBe(401);
   });
@@ -102,12 +120,12 @@ describe("authenticated production boundary", () => {
         headers: { "content-type": "application/json" },
         body: '{"name":"forbidden"}',
       },
-      { POCKET_AUTH_ENABLED: true, OWNER: "user:test", SESSION_OWNER: "user:test" },
+      { AUTH_CONFIGURED: true, OWNER: "user:test", SESSION_OWNER: "user:test" },
     );
     expect(response.status).toBe(403);
   });
   it("rejects anonymous access when explicitly enabled", async () => {
-    const response = await createApi(false).request(endpoint, {}, { POCKET_AUTH_ENABLED: true });
+    const response = await createApi(false).request(endpoint, {}, { AUTH_CONFIGURED: true });
     expect(response.status).toBe(401);
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
@@ -115,20 +133,35 @@ describe("authenticated production boundary", () => {
     const mcp = await createApi(false).request(
       "https://pocket.example/mcp",
       { method: "POST" },
-      { POCKET_AUTH_ENABLED: true },
+      { AUTH_CONFIGURED: true },
     );
     expect(mcp.status).toBe(401);
     expect(mcp.headers.get("www-authenticate")).toContain(
       'resource_metadata="https://pocket.example/.well-known/oauth-protected-resource/mcp"',
     );
-    const rest = await createApi(false).request(endpoint, {}, { POCKET_AUTH_ENABLED: true });
+    const rest = await createApi(false).request(endpoint, {}, { AUTH_CONFIGURED: true });
     expect(rest.headers.get("www-authenticate")).toBeNull();
+  });
+  it("lets only a same-origin browser session manage OAuth connections", async () => {
+    const path = "https://pocket.example/api/oauth-connections?clientId=client";
+    const bearer = await createApi(false).request(
+      path,
+      { method: "DELETE" },
+      { AUTH_CONFIGURED: true, OWNER: "user:test" },
+    );
+    expect(bearer.status).toBe(401);
+    const noOrigin = await createApi(false).request(
+      path,
+      { method: "DELETE" },
+      { AUTH_CONFIGURED: true, OWNER: "user:test", SESSION_OWNER: "user:test" },
+    );
+    expect(noOrigin.status).toBe(403);
   });
   it("does not trust client-supplied owner headers", async () => {
     const response = await createApi(false).request(
       endpoint,
       { headers: { OWNER: "user:victim", "x-user-id": "victim" } },
-      { POCKET_AUTH_ENABLED: true },
+      { AUTH_CONFIGURED: true },
     );
     expect(response.status).toBe(401);
   });
@@ -136,7 +169,7 @@ describe("authenticated production boundary", () => {
     const response = await createApi(false).request(
       endpoint,
       { headers: { origin: "https://evil.example" } },
-      { POCKET_AUTH_ENABLED: true, OWNER: "user:test" },
+      { AUTH_CONFIGURED: true, OWNER: "user:test" },
     );
     expect(response.status).toBe(403);
   });

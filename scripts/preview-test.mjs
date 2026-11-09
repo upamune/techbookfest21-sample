@@ -3,7 +3,7 @@ import { readFile, unlink, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 
-const fixture = `BETTER_AUTH_SECRET=${randomBytes(32).toString("hex")}\nPOCKET_AUTH_ENABLED=false\nPOCKET_ALLOWED_GITHUB_IDS=["424242"]\n`;
+const fixture = `BETTER_AUTH_SECRET=${randomBytes(32).toString("hex")}\nPOCKET_ALLOWED_GITHUB_IDS=["424242"]\nAUTH_GITHUB_CLIENT_ID=\nAUTH_GITHUB_CLIENT_SECRET=\n`;
 await writeFile(".env", fixture, { flag: "wx", mode: 0o600 });
 const env = { ...process.env, POCKET_WORKERS_AI: "off" };
 const build = spawn("npm", ["run", "build"], { stdio: "inherit", env });
@@ -14,7 +14,8 @@ const oauthPreview = spawn("npm", ["run", "preview", "--", "--port", "4281", "--
   env: {
     ...env,
     VOID_INSPECTOR_PORT: "false",
-    POCKET_AUTH_ENABLED: "true",
+    AUTH_GITHUB_CLIENT_ID: "e2e-client",
+    AUTH_GITHUB_CLIENT_SECRET: "e2e-client-secret",
   },
 });
 for (let attempt = 0; attempt < 120; attempt += 1) {

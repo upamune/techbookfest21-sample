@@ -72,7 +72,7 @@ Workers AIはローカルで動かせないため、ビルド結果の`npm run p
 
 ## Thingsの写真
 
-写真はブラウザーで長辺1600pxのJPEG（一覧用は480px）に描き直してから送ります。描き直すとEXIF（撮影位置など）は消えます。1点につき12枚までです。本体はR2、メタデータはD1に保存します。最初の写真が一覧の表紙になります。写真の追加は画面からのみで、MCPとCLIは写真IDの参照と削除だけができます。
+写真はブラウザーで長辺1600pxのJPEG（一覧用は480px）に描き直してから送ります。描き直すとEXIF（撮影位置など）は消えます。1点につき12枚までです。本体はR2、メタデータはD1に保存します。最初の写真が一覧の表紙になります。MCPとCLIからは `things_add_photo` で、画像のhttpsのURLかbase64を渡して追加できます。こちらはCloudflare ImagesのbindingでJPEGに変換し、同じくR2に保存します。URLの取得は公開ホストのhttpsだけに限り、リダイレクト先も検査します。Imagesが使えない環境ではこのツールだけが失敗します。無料枠は月5,000変換で、写真1枚につき最大2変換です。
 
 ## CLIから同じツールを呼ぶ
 
@@ -104,14 +104,14 @@ npm run test:e2e
 
 ## MCPをOAuthで接続する
 
-`POCKET_AUTH_ENABLED=true`のビルドでは、`/mcp`がOAuth 2.1の保護対象になります。未認証の要求には`WWW-Authenticate`で案内を返し、MCPクライアントはログインと同意のあとでトークンを受け取ります。発行したトークンは`/mcp`専用で、Forum と Things の全操作ができます。
+ログインの設定が済んだビルドでは、`/mcp`がOAuth 2.1の保護対象になります。未認証の要求には`WWW-Authenticate`で案内を返し、MCPクライアントはログインと同意のあとでトークンを受け取ります。発行したトークンは`/mcp`専用で、Forum と Things の全操作ができます。接続はポータルの「接続中のアプリ」からいつでも解除でき、解除するとそのアプリはすぐに使えなくなります。
 
 クライアントの登録は Client ID Metadata Document（CIMD）を主に使います。文書を取りに行くホストは`POCKET_CIMD_ALLOWED_HOSTS`（JSON配列、既定は`["claude.ai","chatgpt.com","openai.com"]`、完全一致）に限ります。一覧にないホストは拒否してログに`mcp_oauth.cimd_host_rejected`を残すので、使うクライアントのホストを追加してください。CIMDに対応していないクライアントのために Dynamic Client Registration も有効にしています。
 
 手元で試す手順:
 
 1. GitHubのOAuth Appを作り、callbackを`http://127.0.0.1:4173/api/auth/callback/github`にします。
-2. `.env`に`BETTER_AUTH_SECRET`、`POCKET_AUTH_ENABLED=true`、`POCKET_ALLOWED_GITHUB_IDS=["自分の数値ID"]`、`AUTH_GITHUB_CLIENT_ID`、`AUTH_GITHUB_CLIENT_SECRET`を書きます。`.env`はコミットしません。
+2. `.env`に`BETTER_AUTH_SECRET`、`POCKET_ALLOWED_GITHUB_IDS=["自分の数値ID"]`、`AUTH_GITHUB_CLIENT_ID`、`AUTH_GITHUB_CLIENT_SECRET`を書きます。`.env`はコミットしません。
 3. `npm run db:migrate`、`npm run build`、`npm run preview`の順に実行します。
 4. MCPクライアントに`http://127.0.0.1:4173/mcp`を登録します。
 

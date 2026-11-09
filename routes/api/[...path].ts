@@ -6,7 +6,9 @@ import { storage } from "void/storage";
 import { createApi } from "../../src/http/api";
 import { resolveAccessToken } from "../../src/security/access-tokens";
 import { allowedOwner } from "../../src/security/allowed-owner";
+import { isAuthConfigured } from "../../src/security/auth-config";
 import { isMcpPath, resolveMcpOAuthOwner } from "../../src/security/mcp-oauth";
+import { hasOAuthConsent } from "../../src/security/oauth-connections";
 import { voidAuthHandler } from "../../src/security/void-auth";
 
 const app = createApi(import.meta.env.DEV);
@@ -15,16 +17,21 @@ async function bearerOwner(context: Parameters<Parameters<typeof defineHandler>[
   const request = context.req.raw;
   const tokenOwner = await resolveAccessToken(context.env.DB, request);
   if (tokenOwner !== null || !isMcpPath(new URL(request.url).pathname)) return tokenOwner;
-  return resolveMcpOAuthOwner({ request, authHandler: voidAuthHandler(context) });
+  return resolveMcpOAuthOwner({
+    request,
+    authHandler: voidAuthHandler(context),
+    hasConsent: (consent) => hasOAuthConsent(context.env.DB, consent),
+  });
 }
 
 const handler = defineHandler(async (context) => {
+  const authConfigured = isAuthConfigured(env);
   const user = getUser();
   const sessionOwner = user ? `user:${user.id}` : undefined;
   const hasBearer = context.req.raw.headers.has("authorization");
-  const tokenOwner = hasBearer && env.POCKET_AUTH_ENABLED ? await bearerOwner(context) : null;
+  const tokenOwner = hasBearer && authConfigured ? await bearerOwner(context) : null;
   const principal = hasBearer ? (tokenOwner ?? undefined) : sessionOwner;
-  const permittedOwner = env.POCKET_AUTH_ENABLED
+  const permittedOwner = authConfigured
     ? await allowedOwner({
         binding: context.env.DB,
         owner: principal,
@@ -35,7 +42,8 @@ const handler = defineHandler(async (context) => {
   return app.fetch(context.req.raw, {
     DB: context.env.DB,
     STORAGE: storage,
-    POCKET_AUTH_ENABLED: env.POCKET_AUTH_ENABLED,
+    IMAGES: context.env.IMAGES,
+    AUTH_CONFIGURED: authConfigured,
     OWNER: permittedOwner,
     SESSION_OWNER: hasBearer ? undefined : permittedOwner,
     ASK_AI: {

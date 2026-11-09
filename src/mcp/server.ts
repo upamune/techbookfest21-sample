@@ -1,7 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { ToolConflictError, ToolNotFoundError, type BoundTool } from "@pocket/tools/define-tool";
+import {
+  ToolConflictError,
+  ToolNotFoundError,
+  ToolRejectedError,
+  type BoundTool,
+} from "@pocket/tools/define-tool";
 import { z } from "zod";
 
 function toolResult(value: object, isError = false): CallToolResult {
@@ -9,7 +14,11 @@ function toolResult(value: object, isError = false): CallToolResult {
 }
 
 function failureResult(cause: unknown): CallToolResult {
-  if (cause instanceof ToolNotFoundError || cause instanceof ToolConflictError)
+  if (
+    cause instanceof ToolNotFoundError ||
+    cause instanceof ToolConflictError ||
+    cause instanceof ToolRejectedError
+  )
     return toolResult({ error: cause.message }, true);
   if (cause instanceof z.ZodError) return toolResult({ error: "Invalid input." }, true);
   throw cause;
@@ -27,7 +36,7 @@ function createMcpServer(tools: BoundTool[]) {
           readOnlyHint: tool.effect === "read",
           destructiveHint: tool.effect === "destructive",
           idempotentHint: tool.idempotent,
-          openWorldHint: false,
+          openWorldHint: tool.openWorld === true,
         },
       },
       async (input) => {

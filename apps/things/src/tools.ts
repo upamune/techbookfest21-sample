@@ -1,14 +1,16 @@
 import { toolFactory } from "@pocket/tools/define-tool";
 import {
   addItemInput,
+  addPhotoInput,
   searchItemsInput,
   setItemDeletedInput,
   setPhotoDeletedInput,
   updateItemInput,
 } from "./contracts";
+import type { PhotoStore } from "./photo-store";
 import type { ThingsService } from "./service";
 
-export type ThingsToolContext = { service: ThingsService };
+export type ThingsToolContext = { service: ThingsService; photos: PhotoStore };
 
 const tool = toolFactory<ThingsToolContext>();
 
@@ -73,6 +75,17 @@ export const thingsTools = [
     idempotent: true,
     input: setItemDeletedInput,
     run: (input, { service }) => service.setDeleted(input),
+  }),
+  tool({
+    name: "things_add_photo",
+    label: "写真の追加",
+    description:
+      "持ち物に写真を追加する。sourceは画像のhttpsのURLかbase64で、JPEGに変換して保存する。base64は約1.8MB、URLは10MBまで。1点につき12枚まで。同じrequestIdの再送は新しい写真を作らず、最初の結果を返す。",
+    effect: "write",
+    idempotent: true,
+    openWorld: true,
+    input: addPhotoInput,
+    run: async (input, { photos }) => ({ photo: await photos.add(input) }),
   }),
   tool({
     name: "things_set_photo_deleted",

@@ -853,6 +853,9 @@ test("wider screens get a collapsible sidebar that remembers its state", async (
   const sidebar = page.locator(".app-sidebar");
   await expect(sidebar).toBeVisible();
   await expect(page.locator(".bottom-nav")).toBeHidden();
+  const sidebarBottom = await sidebar.evaluate((element) => element.getBoundingClientRect().bottom);
+  const settingsBottom = (await sidebar.getByRole("link", { name: "設定" }).boundingBox())?.y ?? 0;
+  expect(settingsBottom).toBeGreaterThan(sidebarBottom - 100);
   await expect(sidebar.getByRole("link", { name: "Forum" })).toHaveAttribute(
     "aria-current",
     "page",
@@ -879,6 +882,7 @@ test("wider screens get a collapsible sidebar that remembers its state", async (
 test("phones do not show the sidebar", async ({ page }) => {
   await gotoReady(page, "/forum");
   await expect(page.locator(".app-sidebar")).toBeHidden();
+  await expect(page.locator(".bottom-nav a").last()).toHaveText("設定");
 });
 
 test("wider screens use breadcrumbs instead of bottom navigation", async ({ page }) => {

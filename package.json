@@ -3,7 +3,7 @@
   "version": "0.3.0",
   "private": true,
   "description": "Monorepo of personal apps for people and AI agents, built on Void",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "workspaces": [
     "apps/*",
     "packages/*"

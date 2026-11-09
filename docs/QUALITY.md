@@ -36,6 +36,10 @@ principles, and the Comment Sicko review prompt are vendored from
 `pstack-source.json` records the commit and Git blob IDs. The upstream MIT license
 is retained in `licenses/pstack-LICENSE`.
 
+The animation and design skills in `.agents/skills` come from
+[emilkowalski/skills](https://github.com/emilkowalski/skills) under the MIT license,
+retained in `docs/licenses/emilkowalski-skills-LICENSE`.
+
 Read `.agents/skills/typescript-best-practices/SKILL.md` and the associated
 principles before changing TypeScript. Read `.agents/skills/no-comments/SKILL.md`
 for comment review. This is a focused subset, not installation of the entire

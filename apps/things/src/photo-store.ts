@@ -1,12 +1,16 @@
 import { and, count, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { ToolNotFoundError } from "@pocket/tools/define-tool";
-import { photoLimits, photoRequest, photoSchema, photoUploadForm } from "./contracts";
+import {
+  photoLimits,
+  photoRequest,
+  photoSchema,
+  photoUploadForm,
+  type ItemId,
+  type PhotoSource,
+} from "./contracts";
+import { convertPhoto, loadPhotoBytes, PhotoRejectedError } from "./photo-input";
 import { thingsItems, thingsPhotos } from "./schema";
-
-export class PhotoRejectedError extends Error {
-  override readonly name = "PhotoRejectedError";
-}
 
 const photoNotFound = "写真が見つかりません。";
 
@@ -19,13 +23,17 @@ async function jpegBytes(file: File, maxBytes: number) {
   return bytes;
 }
 
+export type PhotoStore = ReturnType<typeof createPhotoStore>;
+
 export function createPhotoStore({
   binding,
   storage,
+  images,
   ownerId,
 }: {
   binding: D1Database;
   storage: R2Bucket;
+  images?: ImagesBinding;
   ownerId: string;
 }) {
   const database = drizzle(binding);
@@ -61,7 +69,53 @@ export function createPhotoStore({
       throw new PhotoRejectedError(`写真は1点につき${photoLimits.perItem}枚までです。`);
   }
 
+  async function persist({
+    id,
+    itemId,
+    width,
+    height,
+    full,
+    thumb,
+  }: {
+    id: string;
+    itemId: string;
+    width: number;
+    height: number;
+    full: Uint8Array;
+    thumb: Uint8Array;
+  }) {
+    await Promise.all([
+      storage.put(objectKey(id, "full"), full, { httpMetadata }),
+      storage.put(objectKey(id, "thumb"), thumb, { httpMetadata }),
+    ]);
+    const inserted = await database
+      .insert(thingsPhotos)
+      .values({ id, ownerId, itemId, width, height, createdAt: new Date().toISOString() })
+      .onConflictDoNothing({ target: thingsPhotos.id })
+      .returning({ id: thingsPhotos.id });
+    if (inserted.length === 0) throw new PhotoRejectedError("写真を保存できませんでした。");
+    return photoSchema.parse({ id, width, height });
+  }
+
   return {
+    async add({
+      requestId,
+      itemId,
+      source,
+    }: {
+      requestId: string;
+      itemId: ItemId;
+      source: PhotoSource;
+    }) {
+      const [existing] = await database
+        .select({ id: thingsPhotos.id, width: thingsPhotos.width, height: thingsPhotos.height })
+        .from(thingsPhotos)
+        .where(ownedPhoto(requestId));
+      if (existing !== undefined) return photoSchema.parse(existing);
+      await assertItemHasRoom(itemId);
+      const converted = await convertPhoto(images, await loadPhotoBytes(source));
+      return persist({ id: requestId, itemId, ...converted });
+    },
     async save(form: FormData) {
       const input = photoUploadForm.parse(Object.fromEntries(form));
       const dimensions = { width: input.width, height: input.height };
@@ -75,23 +129,7 @@ export function createPhotoStore({
         jpegBytes(input.full, photoLimits.fullBytes),
         jpegBytes(input.thumb, photoLimits.thumbBytes),
       ]);
-      await Promise.all([
-        storage.put(objectKey(input.photoId, "full"), full, { httpMetadata }),
-        storage.put(objectKey(input.photoId, "thumb"), thumb, { httpMetadata }),
-      ]);
-      const inserted = await database
-        .insert(thingsPhotos)
-        .values({
-          id: input.photoId,
-          ownerId,
-          itemId: input.itemId,
-          ...dimensions,
-          createdAt: new Date().toISOString(),
-        })
-        .onConflictDoNothing({ target: thingsPhotos.id })
-        .returning({ id: thingsPhotos.id });
-      if (inserted.length === 0) throw new PhotoRejectedError("写真を保存できませんでした。");
-      return photoSchema.parse({ id: input.photoId, ...dimensions });
+      return persist({ id: input.photoId, itemId: input.itemId, ...dimensions, full, thumb });
     },
     async open(request: unknown) {
       const { id, variant } = photoRequest.parse(request);

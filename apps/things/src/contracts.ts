@@ -53,7 +53,40 @@ export const setItemDeletedInput = { id: itemId, deleted: z.boolean() };
 
 export const setPhotoDeletedInput = { id: photoId, deleted: z.boolean() };
 
-export const photoLimits = { perItem: 12, fullBytes: 1_800_000, thumbBytes: 400_000 };
+export const photoLimits = {
+  perItem: 12,
+  fullBytes: 1_800_000,
+  fullTargetBytes: 1_500_000,
+  thumbBytes: 400_000,
+  remoteBytes: 10_000_000,
+  base64Chars: 2_400_000,
+};
+export const photoRendering = {
+  full: { max: 1600, quality: 0.85 },
+  smallerFull: { max: 1280, quality: 0.7 },
+  thumb: { max: 480, quality: 0.8 },
+};
+
+const photoSource = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("url"),
+    url: z
+      .url({ protocol: /^https$/u })
+      .max(2048)
+      .describe("公開されている画像のhttpsのURL"),
+  }),
+  z.strictObject({
+    kind: z.literal("base64"),
+    data: z.base64().max(photoLimits.base64Chars).describe("画像ファイルのbase64"),
+  }),
+]);
+export const addPhotoInput = {
+  requestId: z
+    .uuid()
+    .describe("書き込みごとに生成するUUID。結果が不明で再送するときは同じ値を使う"),
+  itemId,
+  source: photoSource,
+};
 export const photoUploadForm = z.object({
   photoId,
   itemId,
@@ -78,3 +111,4 @@ export type ItemOptions = z.infer<typeof itemOptionsOutput>;
 export type ItemId = z.infer<typeof itemId>;
 export type Photo = z.infer<typeof photoSchema>;
 export type PhotoId = z.infer<typeof photoId>;
+export type PhotoSource = z.infer<typeof photoSource>;

@@ -13,6 +13,7 @@ import { Avatar } from "@pocket/ui/avatar";
 import { Button } from "@pocket/ui/button";
 import { ErrorNotice } from "@pocket/ui/feedback";
 import { Skeleton } from "@pocket/ui/skeleton";
+import { accountNotPermitted, authErrorParam } from "@/security/auth-error";
 import { oauthAuthClient } from "./oauth-client";
 import { OAuthConnectionsPanel } from "./oauth-connections-panel";
 import { TokenPanel } from "./token-panel";
@@ -139,8 +140,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
   );
 }
 
+function errorFromRedirect() {
+  const code = new URLSearchParams(window.location.search).get(authErrorParam);
+  return code === accountNotPermitted ? "このアカウントにはアクセスが許可されていません。" : null;
+}
+
 function SignIn() {
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(errorFromRedirect);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   async function signIn(provider: "github" | "google") {

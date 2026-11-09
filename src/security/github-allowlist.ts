@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseAllowedSubjects } from "./oauth-allowlist";
+import { parseAllowedSubjects, rejectOAuthAccount } from "./oauth-allowlist";
 
 const githubId = z.string().regex(/^[1-9]\d*$/);
 const githubProfile = z.object({
@@ -24,6 +24,6 @@ export function authorizeGithubProfile({
 }) {
   const parsed = githubProfile.safeParse(profile);
   if (!parsed.success || !isAllowedGithubId({ allowlist, id: parsed.data.id }))
-    throw new Error("GitHub account is not permitted.");
+    rejectOAuthAccount("GitHub account is not permitted.");
   return {};
 }

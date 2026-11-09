@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseAllowedSubjects } from "./oauth-allowlist";
+import { parseAllowedSubjects, rejectOAuthAccount } from "./oauth-allowlist";
 
 const googleSub = z.string().regex(/^[\x21-\x7e]{1,255}$/);
 const googleProfile = z.object({ sub: googleSub });
@@ -22,6 +22,6 @@ export function authorizeGoogleProfile({
 }) {
   const parsed = googleProfile.safeParse(profile);
   if (!parsed.success || !isAllowedGoogleSub({ allowlist, sub: parsed.data.sub }))
-    throw new Error("Google account is not permitted.");
+    rejectOAuthAccount("Google account is not permitted.");
   return {};
 }

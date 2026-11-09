@@ -1,4 +1,14 @@
+import { APIError } from "better-auth/api";
 import { z } from "zod";
+import { accountNotPermitted, authErrorParam } from "./auth-error";
+
+export function rejectOAuthAccount(message: string): never {
+  throw new APIError(
+    "FOUND",
+    { message },
+    { Location: `/?${authErrorParam}=${accountNotPermitted}` },
+  );
+}
 
 export function parseAllowedSubjects({
   value,

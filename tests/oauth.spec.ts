@@ -308,6 +308,12 @@ test("revoking a token asks first and uses a red button", async ({ page, context
   await expect(row).toHaveCount(0);
 });
 
+test("a rejected account is told why on the sign-in screen", async ({ page }) => {
+  await page.goto("/?auth_error=account_not_permitted");
+  await expect(page.getByText("このアカウントにはアクセスが許可されていません。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "GitHubでログイン" })).toBeEnabled();
+});
+
 test("the consent page refuses a request without a signature", async ({ page, context }) => {
   await context.addCookies([sessionCookie()]);
   await page.goto(`/oauth/consent?client_id=x&redirect_uri=${encodeURIComponent(redirectUri)}`);

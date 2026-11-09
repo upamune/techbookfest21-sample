@@ -7,9 +7,11 @@
     "./manifest": "./src/manifest.ts",
     "./server": "./src/server.ts",
     "./contracts": "./src/contracts.ts",
+    "./tools": "./src/tools.ts",
     "./items-page": "./src/items-page.tsx"
   },
   "dependencies": {
+    "@pocket/ask-ai": "*",
     "@pocket/tools": "*",
     "@pocket/ui": "*",
     "drizzle-orm": "0.45.4",

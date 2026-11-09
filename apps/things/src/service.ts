@@ -6,6 +6,7 @@ import {
   getTableColumns,
   inArray,
   isNull,
+  ne,
   or,
   sql,
   type SQL,
@@ -72,7 +73,23 @@ export function createThingsService({
     });
   }
 
+  async function usedValues(column: typeof thingsItems.location | typeof thingsItems.category) {
+    const rows = await database
+      .selectDistinct({ value: column })
+      .from(thingsItems)
+      .where(and(eq(thingsItems.ownerId, ownerId), isNull(thingsItems.deletedAt), ne(column, "")))
+      .orderBy(asc(column));
+    return rows.map((row) => row.value);
+  }
+
   return {
+    async listOptions() {
+      const [locations, categories] = await Promise.all([
+        usedValues(thingsItems.location),
+        usedValues(thingsItems.category),
+      ]);
+      return { locations, categories };
+    },
     async search(query: string) {
       const terms = query.split(/\s+/u).filter(Boolean).slice(0, maxSearchTerms);
       const filter = and(

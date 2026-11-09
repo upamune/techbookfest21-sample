@@ -8,13 +8,13 @@ export function AuthorLabel({
 }) {
   return (
     <span className="author">
+      <span className="author-name">{thread.authorName}</span>
       {thread.authorKind === "agent" && (
         <span className="agent-badge">
           <Bot aria-hidden="true" />
           AI
         </span>
       )}
-      <span className="author-name">{thread.authorName}</span>
     </span>
   );
 }

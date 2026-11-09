@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { threadOutput } from "@pocket/forum/contracts";
+import { replyOutput, threadDetailOutput, threadOutput } from "@pocket/forum/contracts";
 import { itemOutput } from "@pocket/things/contracts";
 
 const now = "2026-11-08T00:00:00.000Z";
@@ -38,6 +38,7 @@ function threadFixture(index: number, title = `スレッド ${index}`) {
     title,
     body: "本文の例です。",
     createdAt: now,
+    archivedAt: null,
     replyCount: index,
     lastActivityAt: now,
   };
@@ -92,7 +93,7 @@ const noHorizontalScroll = (page: Page) =>
 async function expectTouchFriendly(page: Page) {
   const undersized = await page
     .locator(
-      'a:visible, button:visible, input:visible, textarea:visible, [role="checkbox"]:visible',
+      'a:visible, button:visible, input:visible:not([aria-hidden="true"]), textarea:visible, [role="checkbox"]:visible',
     )
     .evaluateAll((elements) =>
       elements
@@ -129,7 +130,7 @@ test("portal lists apps and the bottom navigation switches between them", async 
   await expect(page).toHaveURL(/\/$/);
 });
 
-test("create a thread, reply, undo a reply removal and delete the thread", async ({ page }) => {
+test("create a thread, reply, undo a reply removal, archive and restore", async ({ page }) => {
   const title = `モバイル ${crypto.randomUUID()}`;
   const reply = `返信 ${crypto.randomUUID()}`;
   await gotoReady(page, "/forum");
@@ -139,7 +140,7 @@ test("create a thread, reply, undo a reply removal and delete the thread", async
   await expectTouchFriendly(page);
   await sheet.getByRole("textbox", { name: "タイトル" }).fill(title);
   await sheet.getByRole("textbox", { name: "本文" }).fill("スマホから投稿");
-  await sheet.getByRole("button", { name: "投稿" }).tap();
+  await sheet.getByRole("button", { name: "書き込む" }).tap();
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   await expect(page).toHaveURL(/\/forum\/[0-9a-f-]+$/);
   await expect(page.getByRole("navigation", { name: "アプリ" })).toHaveCount(0);
@@ -148,21 +149,193 @@ test("create a thread, reply, undo a reply removal and delete the thread", async
   await expect(composer).toBeEnabled();
   await expect(composer).toBeInViewport();
   await composer.fill(reply);
-  await page.getByRole("button", { name: "送信" }).tap();
+  await page.getByRole("button", { name: "書き込む" }).tap();
   await expect(page.getByText(reply, { exact: true })).toBeVisible();
   await expect(composer).toHaveValue("");
   await page.reload();
   await expect(page.getByText(reply, { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "自分の返信を削除" }).tap();
+  await page.getByRole("button", { name: "2番の返信を削除" }).tap();
   await expect(page.getByText(reply, { exact: true })).not.toBeVisible();
+  await expect(page.locator("#res-2")).toContainText("このレスは削除されました");
   await page.getByRole("button", { name: "元に戻す" }).tap();
   await expect(page.getByText(reply, { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "スレッドを削除" }).tap();
-  await page.getByRole("button", { name: "削除する" }).tap();
+  const archive = page.getByRole("button", { name: "スレッドをアーカイブ" });
+  const archivedNotice = page.getByText("アーカイブ済みのスレッドです");
+  await archive.tap();
+  await expect(archivedNotice).toBeVisible();
+  await expect(composer).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "2番の返信を削除" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "2番にレス" })).toHaveCount(0);
+  await expectTouchFriendly(page);
+
+  await page.getByRole("link", { name: "Forumに戻る" }).tap();
   await expect(page).toHaveURL(/\/forum$/);
   await expect(page.getByText(title, { exact: true })).not.toBeVisible();
+  await page.getByRole("link", { name: "アーカイブを見る" }).tap();
+  await expect(page).toHaveURL(/\/forum\/archive$/);
+  await page.getByText(title, { exact: true }).tap();
+  await expect(archivedNotice).toBeVisible();
+  await page.getByRole("button", { name: "元に戻す" }).tap();
+  await expect(composer).toBeVisible();
+  await archive.tap();
+  await expect(archivedNotice).toBeVisible();
+});
+
+test("a thread reads like a numbered bulletin board", async ({ page, request }) => {
+  const thread = await createThread(request, `番号 ${crypto.randomUUID()}`);
+  const addReply = (body: string) =>
+    callTool(request, "forum_add_reply", {
+      requestId: crypto.randomUUID(),
+      threadId: thread.id,
+      authorName: "通りすがり",
+      body,
+    });
+  try {
+    const first = replyOutput.parse(await (await addReply("最初のレス")).json()).reply;
+    expect(first.number).toBe(2);
+    await addReply(">>2 への返事と >>99 は存在しない");
+    await callTool(request, "forum_set_reply_deleted", { id: first.id, deleted: true });
+
+    await gotoReady(page, `/forum/${thread.id}`);
+    await expect(page.locator("#res-2")).toContainText("このレスは削除されました");
+    const third = page.locator("#res-3");
+    await expect(third).toContainText("通りすがり");
+    await expect(third.getByRole("link", { name: ">>2" })).toHaveAttribute("href", "#res-2");
+    await expect(third.getByRole("link", { name: ">>99" })).toHaveCount(0);
+    await expectTouchFriendly(page);
+
+    await page.getByRole("button", { name: "3番にレス" }).tap();
+    const composer = page.getByRole("textbox", { name: "返信" });
+    await expect(composer).toBeFocused();
+    await expect(composer).toHaveValue(">>3\n");
+    await composer.fill(">>3 名前付きレス");
+    await expect(page.getByRole("textbox", { name: "名前" })).toHaveCount(0);
+    await page.getByRole("button", { name: "書き込む" }).tap();
+    await expect(page.locator("#res-4")).toContainText("人間");
+    await expect(page.getByRole("button", { name: "4番の返信を削除" })).toBeVisible();
+    expect(await noHorizontalScroll(page)).toBe(true);
+  } finally {
+    await callTool(request, "forum_set_thread_archived", { id: thread.id, archived: true });
+  }
+});
+
+test("command enter sends a reply and control enter creates a thread", async ({
+  page,
+  request,
+}) => {
+  const thread = await createThread(request, `ショートカット ${crypto.randomUUID()}`);
+  let sentReplies = 0;
+  page.on("request", (sent) => {
+    if (sent.url().endsWith("/api/tools/forum_add_reply")) sentReplies += 1;
+  });
+  try {
+    await gotoReady(page, `/forum/${thread.id}`);
+    const composer = page.getByRole("textbox", { name: "返信" });
+    await expect(composer).toBeEnabled();
+    await composer.press("Meta+Enter");
+    await composer.fill("Command で送る");
+    await composer.press("Enter");
+    await expect(composer).toHaveValue("Command で送る\n");
+    expect(sentReplies).toBe(0);
+    await composer.press("Meta+Enter");
+    await expect(page.getByText("Command で送る", { exact: true })).toBeVisible();
+    await expect(composer).toHaveValue("");
+    expect(sentReplies).toBe(1);
+
+    const title = `Control ${crypto.randomUUID()}`;
+    await gotoReady(page, "/forum");
+    await page.getByRole("button", { name: "スレッドを作成" }).tap();
+    const sheet = page.getByRole("dialog");
+    await sheet.getByRole("textbox", { name: "タイトル" }).fill(title);
+    const body = sheet.getByRole("textbox", { name: "本文" });
+    await body.fill("Control で作る");
+    await body.press("Control+Enter");
+    await expect(page.getByRole("heading", { name: title })).toBeVisible();
+    await callTool(request, "forum_set_thread_archived", {
+      id: page.url().split("/").at(-1),
+      archived: true,
+    });
+  } finally {
+    await callTool(request, "forum_set_thread_archived", { id: thread.id, archived: true });
+  }
+});
+
+async function repliesOf(request: APIRequestContext, id: string) {
+  const response = await callTool(request, "forum_get_thread", { id });
+  return threadDetailOutput.parse(await response.json()).replies;
+}
+
+test("Ask AI reads the open thread and writes only after approval", async ({ page, request }) => {
+  const thread = await createThread(request, `AI ${crypto.randomUUID()}`);
+  try {
+    await gotoReady(page, `/forum/${thread.id}`);
+    await page.getByRole("button", { name: "AIに聞く" }).tap();
+    const sheet = page.getByRole("dialog");
+    const question = sheet.getByRole("textbox", { name: "AIへの質問" });
+    await expect(question).toBeFocused();
+    await expectTouchFriendly(page);
+    await question.fill("要点は？");
+    await sheet.getByRole("button", { name: "送信" }).tap();
+    await expect(sheet).toContainText(`見ている画面: ${thread.title}`);
+
+    await question.fill("返信して");
+    await question.press("Meta+Enter");
+    await expect(sheet.getByText("この操作を実行しますか？")).toBeVisible();
+    await expect(sheet).toContainText("AIからの返信です");
+    expect(await repliesOf(request, thread.id)).toHaveLength(0);
+    await expectTouchFriendly(page);
+    await sheet.getByRole("button", { name: "やめる" }).tap();
+    await expect(sheet.getByText("この操作を実行しますか？")).toHaveCount(0);
+    await expect(sheet).toContainText("ツールの結果を確認しました。");
+    expect(await repliesOf(request, thread.id)).toHaveLength(0);
+
+    await question.fill("返信して");
+    await question.press("Meta+Enter");
+    await sheet.getByRole("button", { name: "実行する" }).tap();
+    await expect.poll(async () => (await repliesOf(request, thread.id)).length).toBe(1);
+    const [reply] = await repliesOf(request, thread.id);
+    expect(reply).toMatchObject({
+      kind: "posted",
+      authorKind: "agent",
+      authorName: "Pocket AI",
+      body: "AIからの返信です",
+    });
+  } finally {
+    await callTool(request, "forum_set_thread_archived", { id: thread.id, archived: true });
+  }
+});
+
+test("Ask AI renders Markdown tables without loading remote images", async ({ page }) => {
+  await gotoReady(page, "/things");
+  await page.getByRole("button", { name: "AIに聞く" }).tap();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByRole("button", { name: "持ち物を場所ごとに表でまとめて" }).tap();
+  const table = sheet.getByRole("table");
+  await expect(table.getByRole("columnheader", { name: "場所" })).toBeVisible();
+  await expect(table.getByRole("cell", { name: "本棚" })).toBeVisible();
+  await expect(sheet.locator("strong", { hasText: "合計" })).toBeVisible();
+  await expect(sheet).not.toContainText("|---|");
+  await expect(sheet.locator("img")).toHaveCount(0);
+  expect(await noHorizontalScroll(page)).toBe(true);
+  await expectTouchFriendly(page);
+
+  await sheet.getByRole("button", { name: "新しい会話" }).tap();
+  await expect(sheet.getByRole("table")).toHaveCount(0);
+  await expect(sheet.getByRole("button", { name: "玄関にある物は？" })).toBeVisible();
+});
+
+test("Ask AI reports a connection failure in the sheet", async ({ page }) => {
+  await page.route("**/api/ai/chat", (route) =>
+    route.fulfill({ status: 503, json: { error: "OLLAMA_API_KEY が設定されていません。" } }),
+  );
+  await gotoReady(page, "/things");
+  await page.getByRole("button", { name: "AIに聞く" }).tap();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByRole("textbox", { name: "AIへの質問" }).fill("持ち物は？");
+  await sheet.getByRole("button", { name: "送信" }).tap();
+  await expect(sheet.getByRole("alert")).toContainText("OLLAMA_API_KEY");
 });
 
 test("a failed reply keeps the draft and retries with the same request id", async ({
@@ -185,15 +358,15 @@ test("a failed reply keeps the draft and retries with the same request id", asyn
     const composer = page.getByRole("textbox", { name: "返信" });
     await expect(composer).toBeEnabled();
     await composer.fill("届くまで送る");
-    await page.getByRole("button", { name: "送信" }).tap();
+    await page.getByRole("button", { name: "書き込む" }).tap();
     await expect(page.getByRole("alert")).toContainText("Temporary failure");
     await expect(composer).toHaveValue("届くまで送る");
-    await page.getByRole("button", { name: "送信" }).tap();
+    await page.getByRole("button", { name: "書き込む" }).tap();
     await expect(page.getByText("届くまで送る", { exact: true })).toBeVisible();
     expect(requestIds).toHaveLength(2);
     expect(requestIds[1]).toBe(requestIds[0]);
   } finally {
-    await callTool(request, "forum_set_thread_deleted", { id: thread.id, deleted: true });
+    await callTool(request, "forum_set_thread_archived", { id: thread.id, archived: true });
   }
 });
 
@@ -205,7 +378,10 @@ test("add, search, edit, delete and restore an item", async ({ page }) => {
   await expect(sheet.getByRole("textbox", { name: "名前" })).toBeFocused();
   await expectTouchFriendly(page);
   await sheet.getByRole("textbox", { name: "名前" }).fill(name);
-  await sheet.getByRole("textbox", { name: "しまった場所" }).fill("引き出し");
+  const place = sheet.getByRole("combobox", { name: "しまった場所" });
+  await place.fill("引き出し");
+  await page.getByRole("option", { name: "「引き出し」を追加" }).tap();
+  await expect(place).toHaveValue("引き出し");
   await sheet.getByRole("button", { name: "保存" }).tap();
   await expect(page.getByRole("dialog")).not.toBeVisible();
   const row = page.getByRole("button", { name: new RegExp(name) });
@@ -233,6 +409,56 @@ test("add, search, edit, delete and restore an item", async ({ page }) => {
   await row.tap();
   await sheet.getByRole("button", { name: "削除" }).tap();
   await expect(row).not.toBeVisible();
+});
+
+test("location and category are chosen from used values or added once", async ({
+  page,
+  request,
+}) => {
+  const location = `棚 ${crypto.randomUUID()}`;
+  const name = `単一選択 ${crypto.randomUUID()}`;
+  const seed = await callTool(request, "things_add_item", {
+    requestId: crypto.randomUUID(),
+    name: `既存 ${crypto.randomUUID()}`,
+    location,
+  });
+  const { item: seeded } = itemOutput.parse(await seed.json());
+  try {
+    await gotoReady(page, "/things");
+    await page.getByRole("button", { name: "持ち物を追加" }).tap();
+    const sheet = page.getByRole("dialog");
+    await sheet.getByRole("textbox", { name: "名前" }).fill(name);
+    const select = sheet.getByRole("combobox", { name: "しまった場所" });
+    await select.tap();
+    const existing = page.getByRole("option", { name: location, exact: true });
+    await expect(existing).toHaveCount(1);
+    await expectTouchFriendly(page);
+    await select.fill(location.slice(0, 4));
+    await expect(existing).toBeVisible();
+    await existing.tap();
+    await expect(select).toHaveValue(location);
+    await expect(existing).toHaveCount(0);
+
+    const category = sheet.getByRole("combobox", { name: "カテゴリ" });
+    await category.fill("単一選択テスト");
+    await expect(page.getByRole("option", { name: "「単一選択テスト」を追加" })).toBeVisible();
+    await category.press("Enter");
+    await expect(category).toHaveValue("単一選択テスト");
+    await sheet.getByRole("button", { name: "カテゴリを消去" }).tap();
+    await expect(category).toHaveValue("");
+    await category.fill("単一選択テスト");
+    await sheet.getByRole("button", { name: "保存", includeHidden: true }).tap();
+    await expect(sheet).not.toBeVisible();
+
+    const card = page.getByRole("button", { name: new RegExp(name) });
+    await card.tap();
+    await expect(sheet.getByRole("combobox", { name: "しまった場所" })).toHaveValue(location);
+    await expect(sheet.getByRole("combobox", { name: "カテゴリ" })).toHaveValue("単一選択テスト");
+    await sheet.getByRole("button", { name: "削除" }).tap();
+    await expect(card).not.toBeVisible();
+  } finally {
+    await callTool(request, "things_set_item_deleted", { id: seeded.id, deleted: true });
+  }
 });
 
 test("photos appear in the grid after saving and can be removed", async ({ page, request }) => {
@@ -289,6 +515,23 @@ test("the photo grid uses two columns on a phone", async ({ page }) => {
   expect(boxes[2]?.top).toBeGreaterThan(boxes[0]?.bottom ?? 0);
 });
 
+test("clickable things show the pointer cursor", async ({ page }) => {
+  await page.route(itemsPattern, (route) => route.fulfill({ json: { items: [itemFixture(0)] } }));
+  await gotoReady(page, "/things");
+  const card = page.locator("button.thing-card");
+  await expect(card).toHaveCSS("cursor", "pointer");
+  await expect(page.getByRole("button", { name: "持ち物を追加" })).toHaveCSS("cursor", "pointer");
+  await card.tap();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByRole("button", { name: "カテゴリを消去" })).toHaveCSS(
+    "cursor",
+    "pointer",
+  );
+  await sheet.getByRole("combobox", { name: "カテゴリ" }).tap();
+  await expect(page.getByRole("option", { name: "日用品" })).toHaveCSS("cursor", "pointer");
+  await expect(sheet.getByLabel("写真を追加")).toHaveCSS("cursor", "pointer");
+});
+
 test("the last row stays reachable above the bottom navigation", async ({ page }) => {
   const items = Array.from({ length: 30 }, (_, index) => itemFixture(index));
   await page.route(itemsPattern, (route) => route.fulfill({ json: { items } }));
@@ -301,13 +544,17 @@ test("the last row stays reachable above the bottom navigation", async ({ page }
     .locator(".bottom-nav")
     .evaluate((nav) => nav.getBoundingClientRect().top);
   const fabTop = await page.locator(".fab").evaluate((fab) => fab.getBoundingClientRect().top);
+  const askAi = await page.locator(".ai-fab").evaluate((fab) => fab.getBoundingClientRect());
   expect(rowBottom).toBeLessThanOrEqual(navTop);
-  expect(rowBottom).toBeLessThanOrEqual(fabTop);
+  expect(askAi.bottom).toBeLessThanOrEqual(fabTop);
+  expect(rowBottom).toBeLessThanOrEqual(askAi.top);
 });
 
 test("a long thread keeps the composer on screen", async ({ page }) => {
   const thread = threadFixture(0);
   const replies = Array.from({ length: 40 }, (_, index) => ({
+    kind: "posted",
+    number: index + 2,
     id: crypto.randomUUID(),
     threadId: thread.id,
     authorKind: "agent",
@@ -360,7 +607,7 @@ for (const count of [0, 1, 100]) {
     await page.getByRole("button", { name: "スレッドを作成" }).tap();
     await expect(page.getByRole("dialog")).toBeVisible();
     expect(await noHorizontalScroll(page)).toBe(true);
-    await expect(page.getByRole("button", { name: "投稿" })).toBeAttached();
+    await expect(page.getByRole("button", { name: "書き込む" })).toBeAttached();
     await page.keyboard.press("Escape");
     await page.goto("/things");
     await expect(page.getByRole("searchbox", { name: "持ち物を検索" })).toBeVisible();
@@ -374,7 +621,9 @@ for (const count of [0, 1, 100]) {
 test("worst-case thread content wraps without horizontal scrolling at 320px", async ({ page }) => {
   const thread = threadFixture(0, worstCaseText[0]);
   const { replyCount: _count, lastActivityAt: _last, ...detail } = thread;
-  const replies = worstCaseText.map((body) => ({
+  const replies = worstCaseText.map((body, index) => ({
+    kind: "posted",
+    number: index + 2,
     id: crypto.randomUUID(),
     threadId: thread.id,
     authorKind: "agent",
@@ -428,7 +677,7 @@ test("thread skeleton matches the heading block without shifting the layout", as
   await observeLayoutShift(page);
   await page.goto(`/forum/${thread.id}`);
   const head = page.locator(".thread-head");
-  await expect(head.locator('[data-slot="skeleton"]')).toHaveCount(3);
+  await expect(head.locator('[data-slot="skeleton"]')).toHaveCount(4);
   const skeletonHeight = await head.evaluate((element) => element.getBoundingClientRect().height);
   response.release();
   await expect(head.getByRole("heading", { name: thread.title })).toBeVisible();

@@ -42,6 +42,7 @@
   --sidebar-width: 0px;
   --nav-offset: calc(var(--nav-height) + var(--safe-bottom));
   --content-width: 40rem;
+  --ai-color: #6d55d6;
 }
 @layer base {
   * {
@@ -67,6 +68,10 @@
   input,
   textarea {
     touch-action: manipulation;
+  }
+  button:not(:disabled),
+  input[type="file"]:not(:disabled) {
+    cursor: pointer;
   }
 }
 .app-bar {
@@ -168,9 +173,51 @@
   background: var(--primary);
   color: var(--primary-foreground);
   box-shadow: 0 6px 16px rgb(0 0 0 / 0.22);
-  transition: transform 120ms var(--ease-out);
+  transition: transform 160ms var(--ease-out);
 }
-.fab:active {
+.ai-fab {
+  position: fixed;
+  right: calc(var(--gutter-end) + 0.25rem);
+  bottom: calc(var(--nav-offset) + 5.25rem);
+  z-index: 15;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  background: var(--ai-color);
+  color: #fff;
+  box-shadow: 0 6px 16px rgb(79 56 180 / 0.35);
+  transition: transform 160ms var(--ease-out);
+}
+.ai-fab svg {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+.ai-icon {
+  color: var(--ai-color);
+}
+.tab-screen .page:has(~ .ai-fab) {
+  padding-bottom: calc(var(--nav-offset) + 9.25rem);
+}
+.fab svg,
+.ai-fab svg {
+  transition: transform 200ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .fab:hover,
+  .ai-fab:hover {
+    transform: translateY(-2px) scale(1.06);
+  }
+  .fab:hover svg {
+    transform: rotate(90deg);
+  }
+  .ai-fab:hover svg {
+    transform: rotate(14deg) scale(1.12);
+  }
+}
+.fab:active,
+.ai-fab:active {
   transform: scale(0.94);
 }
 .fab svg {
@@ -178,6 +225,7 @@
   height: 1.5rem;
 }
 .fab:focus-visible,
+.ai-fab:focus-visible,
 .icon-link:focus-visible,
 .bottom-nav-item:focus-visible,
 .snackbar-action:focus-visible {
@@ -186,7 +234,8 @@
 }
 @media (pointer: coarse) {
   body:has(input:focus, textarea:focus) .bottom-nav,
-  body:has(input:focus, textarea:focus) .fab {
+  body:has(input:focus, textarea:focus) .fab,
+  body:has(input:focus, textarea:focus) .ai-fab {
     display: none;
   }
 }
@@ -254,6 +303,86 @@
 }
 .textarea::placeholder {
   color: var(--muted-foreground);
+}
+.combobox-group {
+  position: relative;
+}
+.combobox-group [data-slot="input"] {
+  padding-inline-end: var(--touch-target);
+}
+.combobox-action {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  color: var(--muted-foreground);
+  transform: translateY(-50%);
+}
+.combobox-action svg {
+  width: 1rem;
+  height: 1rem;
+}
+.combobox-action:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -4px;
+  border-radius: var(--radius-xl);
+}
+.combobox-positioner {
+  z-index: 60;
+}
+.combobox-popup {
+  width: var(--anchor-width);
+  max-height: min(16rem, var(--available-height));
+  padding: 0.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--background);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity 150ms var(--ease-out),
+    transform 150ms var(--ease-out);
+}
+.combobox-popup[data-starting-style],
+.combobox-popup[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.97);
+}
+.combobox-empty:not(:empty) {
+  padding: 0.75rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+.combobox-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: var(--touch-target);
+  padding-inline: 0.75rem;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  user-select: none;
+}
+.combobox-item[data-highlighted] {
+  background: var(--secondary);
+}
+.combobox-item svg {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .combobox-popup[data-starting-style],
+  .combobox-popup[data-ending-style] {
+    transform: none;
+  }
 }
 .sheet-overlay {
   position: fixed;
@@ -651,12 +780,22 @@
 @media (prefers-reduced-motion: reduce) {
   [data-slot="button"],
   .fab,
+  .ai-fab,
   .portal-card {
     transition: none;
   }
+  .fab:hover,
+  .ai-fab:hover,
+  .fab:hover svg,
+  .ai-fab:hover svg,
   .fab:active,
+  .ai-fab:active,
   .portal-card:active {
     transform: none;
+  }
+  .fab svg,
+  .ai-fab svg {
+    transition: none;
   }
   .sheet {
     animation: none;

@@ -14,7 +14,7 @@ export const forumThreads = sqliteTable(
     title: text("title").notNull(),
     body: text("body").notNull(),
     createdAt: text("created_at").notNull(),
-    deletedAt: text("deleted_at"),
+    archivedAt: text("archived_at"),
   },
   (table) => [
     uniqueIndex("forum_threads_request").on(table.ownerId, table.requestId),

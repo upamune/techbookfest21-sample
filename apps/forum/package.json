@@ -7,10 +7,13 @@
     "./manifest": "./src/manifest.ts",
     "./server": "./src/server.ts",
     "./contracts": "./src/contracts.ts",
+    "./tools": "./src/tools.ts",
+    "./archive-page": "./src/archive-page.tsx",
     "./threads-page": "./src/threads-page.tsx",
     "./thread-page": "./src/thread-page.tsx"
   },
   "dependencies": {
+    "@pocket/ask-ai": "*",
     "@pocket/tools": "*",
     "@pocket/ui": "*",
     "@void/react": "1.6.2",

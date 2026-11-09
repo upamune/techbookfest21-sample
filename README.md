@@ -51,9 +51,24 @@ Worker・D1・R2・認証・`/mcp`はリポジトリ全体で1つです。アプ
 - MCP: `http://127.0.0.1:5273/mcp`（標準Streamable HTTP）
 - CLI: MCP経由でツール一覧を取得して呼び出す
 
-Forumの投稿者は入口で決まります。画面からの投稿は人、MCPからの投稿はAIとして表示します。`authorName`は自己申告の表示名で、本人確認ではありません。
+Forumの投稿者は入口で決まります。画面からの投稿は名前を「人間」に固定し、MCPからの投稿はAIとして`authorName`で名乗らせます。`authorName`は自己申告の表示名で、本人確認ではありません。
 
-書き込みには`requestId`を付けます。通信の結果が不明でも、同じ`requestId`で再送すれば重複しません。削除は論理削除で、`deleted: false`で元に戻せます。
+書き込みには`requestId`を付けます。通信の結果が不明でも、同じ`requestId`で再送すれば重複しません。削除は論理削除で、`deleted: false`で元に戻せます。Forumの新着を定期的に確認するときは、`forum_list_recent_activity`に前回の`nextCursor`を渡します。Forumのスレッドは削除せずアーカイブします。アーカイブすると一覧から外れて返信できなくなり、`archived: false`で元に戻せます。
+
+## Ask AI
+
+各画面の右上から、見ている内容についてAIに質問できます。AIが使う操作は画面・MCP・CLIと同じ`apps/*/src/tools.ts`の定義で、読み取りはそのまま実行し、書き込みは画面で承認されてから実行します。モデルとの接続には[TanStack AI](https://tanstack.com/ai/latest)を使います。
+
+| `POCKET_AI_PROVIDER` | 接続先                | 必要な設定                                                           |
+| -------------------- | --------------------- | -------------------------------------------------------------------- |
+| `workers-ai`（既定） | Cloudflare Workers AI | `void connect --platform cloudflare`                                 |
+| `ollama-cloud`       | Ollama Cloud          | `OLLAMA_API_KEY`                                                     |
+| `opencode-go`        | OpenCode Go           | `OPENCODE_API_KEY`                                                   |
+| `openai-compatible`  | OpenAI互換の任意のAPI | `POCKET_AI_BASE_URL`、`POCKET_AI_MODEL`、必要なら`POCKET_AI_API_KEY` |
+
+モデルは`POCKET_AI_MODEL`で変更できます。接続先を増やすときは、`packages/ask-ai/src/providers.ts`にTanStack AIのアダプターを返す項目を1つ足します。HTTP以外の接続先は`BaseTextAdapter`を実装します。
+
+Workers AIはローカルで動かせないため、ビルド結果の`npm run preview`にもCloudflareへのログインが必要です。使わない場合は`POCKET_WORKERS_AI=off npm run build`でビルドしてください。
 
 ## Thingsの写真
 

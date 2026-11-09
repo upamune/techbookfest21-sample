@@ -5,7 +5,9 @@ import { createApi } from "./api";
 import { createTokenService, resolveAccessToken } from "../security/access-tokens";
 import { allowedOwner } from "../security/allowed-owner";
 import {
-  deletionOutput,
+  archiveOutput,
+  recentActivityOutput,
+  replyOutput,
   threadDetailOutput,
   threadListOutput,
   threadOutput,
@@ -140,7 +142,7 @@ describe("real D1 owner isolation", () => {
       };
       expect((await call("forum_add_reply", otherReply, other)).status).toBe(404);
       expect(
-        (await call("forum_set_thread_deleted", { id: thread.id, deleted: true }, other)).status,
+        (await call("forum_set_thread_archived", { id: thread.id, archived: true }, other)).status,
       ).toBe(404);
       const replyInput = { ...otherReply, authorName: "自分", body: "返信" };
       for (let attempt = 0; attempt < 2; attempt += 1)
@@ -150,15 +152,65 @@ describe("real D1 owner isolation", () => {
       );
       expect(detail.replies).toHaveLength(1);
       expect((await listFor(owner))[0]?.replyCount).toBe(1);
-      const deletion = await call(
-        "forum_set_thread_deleted",
-        { id: thread.id, deleted: true },
+      const archiving = await call(
+        "forum_set_thread_archived",
+        { id: thread.id, archived: true },
         owner,
       );
-      expect(deletionOutput.parse(await deletion.json()).deleted).toBe(true);
-      expect((await call("forum_get_thread", { id: thread.id }, owner)).status).toBe(404);
-      await call("forum_set_thread_deleted", { id: thread.id, deleted: false }, owner);
+      expect(archiveOutput.parse(await archiving.json()).archived).toBe(true);
+      expect(await listFor(owner)).toEqual([]);
+      const archivedDetail = threadDetailOutput.parse(
+        await (await call("forum_get_thread", { id: thread.id }, owner)).json(),
+      );
+      expect(archivedDetail.thread.archivedAt).not.toBeNull();
+      const lateReply = { ...replyInput, requestId: crypto.randomUUID() };
+      expect((await call("forum_add_reply", lateReply, owner)).status).toBe(409);
+      const archivedList = threadListOutput.parse(
+        await (await call("forum_list_threads", { archived: true }, owner)).json(),
+      ).threads;
+      expect(archivedList.map((item) => item.id)).toEqual([thread.id]);
+      await call("forum_set_thread_archived", { id: thread.id, archived: false }, owner);
       expect(await listFor(owner)).toHaveLength(1);
+
+      const activityFor = async (input: object, environment: typeof owner = owner) =>
+        recentActivityOutput.parse(
+          await (await call("forum_list_recent_activity", input, environment)).json(),
+        );
+      const latest = await activityFor({});
+      expect(latest.activities.map((activity) => [activity.kind, activity.number])).toEqual([
+        ["thread", 1],
+        ["reply", 2],
+      ]);
+      expect(latest.hasMore).toBe(false);
+      expect((await activityFor({}, other)).activities).toEqual([]);
+      const start = String(latest.nextCursor);
+      expect((await activityFor({ after: start })).activities).toEqual([]);
+      const postReply = async (body: string) =>
+        replyOutput.parse(
+          await (
+            await call(
+              "forum_add_reply",
+              { requestId: crypto.randomUUID(), threadId: thread.id, authorName: "自分", body },
+              owner,
+            )
+          ).json(),
+        ).reply;
+      const second = await postReply("二件目");
+      await postReply("三件目");
+      const firstPage = await activityFor({ after: start, limit: 1 });
+      expect(firstPage.activities.map((activity) => activity.body)).toEqual(["二件目"]);
+      expect(firstPage.activities.map((activity) => activity.number)).toEqual([3]);
+      expect(firstPage.hasMore).toBe(true);
+      const secondPage = await activityFor({ after: firstPage.nextCursor, limit: 1 });
+      expect(secondPage.activities.map((activity) => activity.body)).toEqual(["三件目"]);
+      expect(secondPage.hasMore).toBe(false);
+      await call("forum_set_reply_deleted", { id: second.id, deleted: true }, owner);
+      expect((await activityFor({ after: start })).activities.map((item) => item.body)).toEqual([
+        "三件目",
+      ]);
+      await call("forum_set_thread_archived", { id: thread.id, archived: true }, owner);
+      expect((await activityFor({ after: start })).activities).toEqual([]);
+      await call("forum_set_thread_archived", { id: thread.id, archived: false }, owner);
 
       const itemInput = { requestId: crypto.randomUUID(), name: "100%の傘", location: "玄関" };
       const { item } = itemOutput.parse(

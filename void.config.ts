@@ -30,4 +30,5 @@ export default defineConfig({
     ],
   },
   worker: { compatibility_date: "2026-11-06" },
+  inference: { bindings: { ai: process.env.POCKET_WORKERS_AI !== "off" } },
 });

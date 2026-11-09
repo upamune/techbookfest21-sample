@@ -3,11 +3,18 @@ import { Boxes, Plus, Search } from "lucide-react";
 import { callTool } from "@pocket/tools/request";
 import { useMutation } from "@pocket/tools/use-mutation";
 import { useToolQuery } from "@pocket/tools/use-tool-query";
+import { AskAiButton } from "@pocket/ask-ai/ask-ai-button";
 import { AppBar } from "@pocket/ui/app-bar";
 import { EmptyState, ErrorNotice, Snackbar, type SnackbarMessage } from "@pocket/ui/feedback";
 import { Input } from "@pocket/ui/input";
 import { Skeleton } from "@pocket/ui/skeleton";
-import { deletionOutput, itemListOutput, type Item } from "./contracts";
+import {
+  deletionOutput,
+  itemListOutput,
+  itemOptionsOutput,
+  type Item,
+  type ItemOptions,
+} from "./contracts";
 import { ItemCard } from "./item-card";
 import { ItemSheet, type ItemSheetMode } from "./item-sheet";
 
@@ -23,6 +30,33 @@ function useDebouncedValue(value: string) {
   return debounced;
 }
 
+const noOptions: ItemOptions = { locations: [], categories: [] };
+
+function useItemOptions() {
+  const [options, setOptions] = useState(noOptions);
+  const [failed, setFailed] = useState(false);
+  const reload = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const loaded = await callTool({
+        name: "things_list_options",
+        input: {},
+        schema: itemOptionsOutput,
+        signal,
+      });
+      setOptions(loaded);
+      setFailed(false);
+    } catch {
+      if (!signal?.aborted) setFailed(true);
+    }
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    void reload(controller.signal);
+    return () => controller.abort();
+  }, [reload]);
+  return { options, failed, reload };
+}
+
 export function ItemsPage() {
   const [query, setQuery] = useState("");
   const activeQuery = useDebouncedValue(query.trim());
@@ -35,6 +69,12 @@ export function ItemsPage() {
   const [snackbar, setSnackbar] = useState<SnackbarMessage | null>(null);
   const dismissSnackbar = useCallback(() => setSnackbar(null), []);
   const restore = useMutation();
+  const itemOptions = useItemOptions();
+
+  function refreshAll() {
+    void refresh();
+    void itemOptions.reload();
+  }
 
   function announceDeleted(item: Item) {
     setSnackbar({
@@ -47,7 +87,7 @@ export function ItemsPage() {
             input: { id: item.id, deleted: false },
             schema: deletionOutput,
           });
-          await refresh();
+          refreshAll();
         });
       },
     });
@@ -83,6 +123,7 @@ export function ItemsPage() {
           />
         )}
       </main>
+      <AskAiButton floating suggestions={["持ち物を場所ごとに表でまとめて", "玄関にある物は？"]} />
       <button
         type="button"
         className="fab"
@@ -94,11 +135,13 @@ export function ItemsPage() {
       <Snackbar message={snackbar} onDismiss={dismissSnackbar} />
       <ItemSheet
         mode={sheet}
+        options={itemOptions.options}
+        optionsFailed={itemOptions.failed}
         onClose={() => setSheet(null)}
-        onSaved={() => void refresh()}
+        onSaved={refreshAll}
         onDeleted={(item) => {
           announceDeleted(item);
-          void refresh();
+          refreshAll();
         }}
       />
     </>

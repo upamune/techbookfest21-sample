@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
+    "@pocket/ask-ai": "*",
     "@pocket/forum": "*",
     "@pocket/things": "*",
     "@pocket/tools": "*",

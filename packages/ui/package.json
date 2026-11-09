@@ -11,7 +11,9 @@
     "./sheet": "./src/primitives/sheet.tsx",
     "./app-bar": "./src/app-bar.tsx",
     "./feedback": "./src/feedback.tsx",
+    "./creatable-select": "./src/creatable-select.tsx",
     "./format": "./src/format.ts",
+    "./submit-shortcut": "./src/submit-shortcut.ts",
     "./use-keyboard-inset": "./src/use-keyboard-inset.ts"
   },
   "dependencies": {

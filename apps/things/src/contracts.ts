@@ -67,9 +67,14 @@ export const photoOutput = z.strictObject({ photo: photoSchema });
 
 export const itemListOutput = z.strictObject({ items: z.array(itemSchema) });
 export const itemOutput = z.strictObject({ item: itemSchema });
+export const itemOptionsOutput = z.strictObject({
+  locations: z.array(location),
+  categories: z.array(category),
+});
 export const deletionOutput = z.strictObject({ deleted: z.boolean() });
 
 export type Item = z.infer<typeof itemSchema>;
+export type ItemOptions = z.infer<typeof itemOptionsOutput>;
 export type ItemId = z.infer<typeof itemId>;
 export type Photo = z.infer<typeof photoSchema>;
 export type PhotoId = z.infer<typeof photoId>;

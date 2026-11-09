@@ -1,4 +1,5 @@
 import { defineHandler } from "void";
+import { ai } from "void/ai";
 import { getUser } from "void/auth";
 import { env } from "void/env";
 import { storage } from "void/storage";
@@ -30,6 +31,15 @@ const handler = defineHandler(async (context) => {
     POCKET_AUTH_ENABLED: env.POCKET_AUTH_ENABLED,
     OWNER: permittedOwner,
     SESSION_OWNER: hasBearer ? undefined : permittedOwner,
+    ASK_AI: {
+      provider: env.POCKET_AI_PROVIDER,
+      model: env.POCKET_AI_MODEL,
+      workersAi: ai,
+      ollamaApiKey: env.OLLAMA_API_KEY,
+      opencodeApiKey: env.OPENCODE_API_KEY,
+      baseUrl: env.POCKET_AI_BASE_URL,
+      apiKey: env.POCKET_AI_API_KEY,
+    },
   });
 });
 export { handler as GET, handler as POST, handler as PATCH, handler as DELETE, handler as OPTIONS };

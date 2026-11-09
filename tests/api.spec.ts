@@ -12,10 +12,12 @@ const expectedTools = [
   "forum_add_reply",
   "forum_create_thread",
   "forum_get_thread",
+  "forum_list_recent_activity",
   "forum_list_threads",
   "forum_set_reply_deleted",
-  "forum_set_thread_deleted",
+  "forum_set_thread_archived",
   "things_add_item",
+  "things_list_options",
   "things_search_items",
   "things_set_item_deleted",
   "things_set_photo_deleted",
@@ -91,15 +93,37 @@ test("Web and MCP share forum data and separate human from agent authors", async
       arguments: { requestId, threadId: thread.id, authorName: "Claude", body: " " },
     });
     expect(invalid.isError).toBe(true);
+    for (const authorName of [undefined, " "]) {
+      const unnamed = await client.callTool({
+        name: "forum_add_reply",
+        arguments: {
+          requestId: crypto.randomUUID(),
+          threadId: thread.id,
+          ...(authorName === undefined ? {} : { authorName }),
+          body: "名乗らない返信",
+        },
+      });
+      expect(unnamed.isError).toBe(true);
+    }
     const absent = await client.callTool({
       name: "forum_get_thread",
       arguments: { id: crypto.randomUUID() },
     });
     expect(absent.isError).toBe(true);
   } finally {
-    await callTool(request, "forum_set_thread_deleted", { id: thread.id, deleted: true });
+    await callTool(request, "forum_set_thread_archived", { id: thread.id, archived: true });
     await client.close();
   }
+});
+
+test("Ask AI rejects malformed requests before calling a model", async ({ request }) => {
+  const text = await request.post("/api/ai/chat", {
+    data: "hello",
+    headers: { "content-type": "text/plain" },
+  });
+  expect(text.status()).toBe(415);
+  const invalid = await request.post("/api/ai/chat", { data: { messages: "x" } });
+  expect(invalid.status()).toBe(400);
 });
 
 test("MCP tools advertise read and write effects", async () => {

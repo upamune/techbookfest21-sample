@@ -1,1 +1,1 @@
-export const webAuthorName = "自分";
+export const webAuthorName = "人間";

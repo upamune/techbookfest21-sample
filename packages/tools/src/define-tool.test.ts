@@ -5,6 +5,7 @@ import { bindTools, toolFactory } from "./define-tool";
 const tool = toolFactory<{ suffix: string }>();
 const greet = tool({
   name: "greet",
+  label: "挨拶",
   description: "挨拶する",
   effect: "read",
   idempotent: true,

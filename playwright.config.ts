@@ -32,10 +32,21 @@ export default defineConfig({
       gracefulShutdown: { signal: "SIGTERM", timeout: 5000 },
     },
     {
+      command: "node scripts/fake-llm.mjs",
+      url: "http://127.0.0.1:4274",
+      reuseExistingServer: false,
+    },
+    {
       command: "npm run dev",
       url: "http://127.0.0.1:5273",
       timeout: 120000,
       reuseExistingServer: false,
+      env: {
+        POCKET_WORKERS_AI: "off",
+        POCKET_AI_PROVIDER: "openai-compatible",
+        POCKET_AI_BASE_URL: "http://127.0.0.1:4274/v1",
+        POCKET_AI_MODEL: "fake",
+      },
     },
   ],
 });

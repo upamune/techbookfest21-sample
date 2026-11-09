@@ -1,8 +1,14 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
+import {
+  AskAiBadRequestError,
+  AskAiUnavailableError,
+  respondToAskAi,
+  type AskAiEnvironment,
+} from "@pocket/ask-ai/server";
 import { createPhotoStore, PhotoRejectedError } from "@pocket/things/server";
-import { ToolNotFoundError, type ToolCaller } from "@pocket/tools/define-tool";
+import { ToolConflictError, ToolNotFoundError, type ToolCaller } from "@pocket/tools/define-tool";
 import { z } from "zod";
 import { bindAppTools } from "../app-tools";
 import { handleMcp } from "../mcp/server";
@@ -13,11 +19,14 @@ import { registerTokenRoutes } from "./tokens";
 const defaultBodyLimit = 8192;
 const photoBodyLimit = 2_500_000;
 const photoCollectionPath = "/api/things/photos";
+const askAiBodyLimit = 256 * 1024;
+const askAiPath = "/api/ai/chat";
 
 function bodyLimit(request: Request) {
-  return request.method === "POST" && new URL(request.url).pathname === photoCollectionPath
-    ? photoBodyLimit
-    : defaultBodyLimit;
+  if (request.method !== "POST") return defaultBodyLimit;
+  const { pathname } = new URL(request.url);
+  if (pathname === photoCollectionPath) return photoBodyLimit;
+  return pathname === askAiPath ? askAiBodyLimit : defaultBodyLimit;
 }
 
 function mediaTypeOf(request: Request) {
@@ -30,6 +39,7 @@ export type Bindings = {
   OWNER?: string;
   SESSION_OWNER?: string;
   POCKET_AUTH_ENABLED?: boolean;
+  ASK_AI?: AskAiEnvironment;
 };
 
 export function createApi(development: boolean) {
@@ -62,6 +72,17 @@ export function createApi(development: boolean) {
     if (tool === undefined) return context.json({ error: "Tool not found." }, 404);
     return context.json(await tool.execute(await context.req.json<unknown>()));
   });
+  app.post(askAiPath, async (context) => {
+    if (mediaTypeOf(context.req.raw) !== "application/json")
+      return context.json({ error: "Expected application/json." }, 415);
+    if (context.env.ASK_AI === undefined) return context.json({ error: "Ask AI is off." }, 503);
+    return respondToAskAi({
+      body: await context.req.json<unknown>(),
+      tools: toolsFor(context.env, "ask-ai"),
+      environment: context.env.ASK_AI,
+      signal: context.req.raw.signal,
+    });
+  });
   const photoStoreFor = (env: Bindings) =>
     createPhotoStore({
       binding: env.DB,
@@ -86,7 +107,10 @@ export function createApi(development: boolean) {
   app.notFound((context) => context.json({ error: "Route not found." }, 404));
   app.onError((error, context) => {
     if (error instanceof ToolNotFoundError) return context.json({ error: error.message }, 404);
+    if (error instanceof ToolConflictError) return context.json({ error: error.message }, 409);
     if (error instanceof PhotoRejectedError) return context.json({ error: error.message }, 422);
+    if (error instanceof AskAiBadRequestError) return context.json({ error: error.message }, 400);
+    if (error instanceof AskAiUnavailableError) return context.json({ error: error.message }, 503);
     if (error instanceof z.ZodError) return context.json({ error: "Invalid input." }, 400);
     if (error instanceof SyntaxError) return context.json({ error: "Invalid JSON." }, 400);
     if (error instanceof HTTPException) return context.json({ error: error.message }, error.status);

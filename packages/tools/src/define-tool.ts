@@ -1,14 +1,20 @@
 import { z } from "zod";
 
 export type ToolEffect = "read" | "write" | "destructive";
-export type ToolCaller = "web" | "mcp";
+export type ToolCaller = "web" | "mcp" | "ask-ai";
 
 export class ToolNotFoundError extends Error {
   override readonly name = "ToolNotFoundError";
 }
 
+export class ToolConflictError extends Error {
+  override readonly name = "ToolConflictError";
+}
+
 type ToolSpec<Shape extends z.ZodRawShape> = {
   name: string;
+  label: string;
+  fields?: Record<string, string>;
   description: string;
   effect: ToolEffect;
   idempotent: boolean;

@@ -1,41 +1,42 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Link, useRouter } from "@void/react";
-import { MessagesSquare, Plus } from "lucide-react";
+import { Archive, MessagesSquare, Plus } from "lucide-react";
 import { callTool } from "@pocket/tools/request";
 import { useMutation } from "@pocket/tools/use-mutation";
-import { forgetLoadedResults, useToolQuery } from "@pocket/tools/use-tool-query";
+import { forgetLoadedResults } from "@pocket/tools/use-tool-query";
+import { AskAiButton } from "@pocket/ask-ai/ask-ai-button";
 import { AppBar } from "@pocket/ui/app-bar";
 import { Button } from "@pocket/ui/button";
 import { EmptyState, ErrorNotice } from "@pocket/ui/feedback";
-import { formatRelativeTime } from "@pocket/ui/format";
 import { Input } from "@pocket/ui/input";
 import { Sheet, SheetContent, SheetFooter, SheetTitle } from "@pocket/ui/sheet";
-import { Skeleton } from "@pocket/ui/skeleton";
+import { submitOnCommandEnter } from "@pocket/ui/submit-shortcut";
 import { Textarea } from "@pocket/ui/textarea";
-import { AuthorLabel } from "./author-label";
-import { threadListOutput, threadOutput, type ThreadSummary } from "./contracts";
+import { threadOutput } from "./contracts";
+import { ThreadListMain } from "./thread-list";
 import { webAuthorName } from "./web-author";
 
-const noInput = {};
-
 export function ThreadsPage() {
-  const { state, refresh } = useToolQuery({
-    name: "forum_list_threads",
-    input: noInput,
-    schema: threadListOutput,
-  });
   const [composing, setComposing] = useState(false);
   return (
     <>
-      <AppBar title="Forum" />
-      <main className="page" aria-busy={state.kind === "loading" || state.kind === "refreshing"}>
-        {state.kind === "stale" && <ErrorNotice message={state.message} />}
-        {state.kind === "loading" && <ThreadListSkeleton />}
-        {state.kind === "failed" && (
-          <ErrorNotice message={state.message} onRetry={() => void refresh()} />
-        )}
-        {"data" in state && <ThreadList threads={state.data.threads} />}
-      </main>
+      <AppBar
+        title="Forum"
+        actions={
+          <Link className="icon-link" href="/forum/archive" aria-label="アーカイブを見る">
+            <Archive aria-hidden="true" />
+          </Link>
+        }
+      />
+      <ThreadListMain
+        archived={false}
+        empty={
+          <EmptyState icon={MessagesSquare} title="まだスレッドはありません">
+            右下のボタンから、最初の話題を投稿できます。
+          </EmptyState>
+        }
+      />
+      <AskAiButton floating suggestions={["最近の話題をまとめて", "返信がないスレッドは？"]} />
       <button
         type="button"
         className="fab"
@@ -45,61 +46,6 @@ export function ThreadsPage() {
         <Plus aria-hidden="true" />
       </button>
       <NewThreadSheet open={composing} onClose={() => setComposing(false)} />
-    </>
-  );
-}
-
-function ThreadList({ threads }: { threads: ThreadSummary[] }) {
-  if (threads.length === 0)
-    return (
-      <EmptyState icon={MessagesSquare} title="まだスレッドはありません">
-        右下のボタンから、最初の話題を投稿できます。
-      </EmptyState>
-    );
-  return (
-    <ul className="thread-list">
-      {threads.map((thread) => (
-        <li key={thread.id}>
-          <Link className="thread-row" href={`/forum/${thread.id}`}>
-            <span className="thread-row-title">{thread.title}</span>
-            <span className="thread-row-body">{thread.body}</span>
-            <span className="thread-row-meta">
-              <AuthorLabel thread={thread} />
-              <span>{formatRelativeTime(thread.lastActivityAt)}</span>
-              <span className="thread-row-replies">返信 {thread.replyCount}</span>
-            </span>
-          </Link>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-const skeletonWidths = ["72%", "54%", "63%", "48%"];
-
-function ThreadListSkeleton() {
-  return (
-    <>
-      <p role="status" className="sr-only">
-        読み込み中…
-      </p>
-      <ul className="thread-list" aria-hidden="true">
-        {skeletonWidths.map((width) => (
-          <li key={width}>
-            <div className="thread-row">
-              <span className="thread-row-title">
-                <Skeleton className="skeleton-line" style={{ width }} />
-              </span>
-              <span className="thread-row-body">
-                <Skeleton className="skeleton-line" />
-              </span>
-              <span className="thread-row-meta">
-                <Skeleton className="skeleton-line skeleton-meta" />
-              </span>
-            </div>
-          </li>
-        ))}
-      </ul>
     </>
   );
 }
@@ -135,8 +81,12 @@ function NewThreadSheet({ open, onClose }: { open: boolean; onClose: () => void 
       }}
     >
       <SheetContent initialFocus={titleRef}>
-        <SheetTitle>新しいスレッド</SheetTitle>
-        <form className="sheet-form" onSubmit={(event) => void submit(event)}>
+        <SheetTitle>スレッドを作成</SheetTitle>
+        <form
+          className="sheet-form"
+          onSubmit={(event) => void submit(event)}
+          onKeyDown={submitOnCommandEnter}
+        >
           <label className="field">
             <span className="field-label">タイトル</span>
             <Input
@@ -166,7 +116,7 @@ function NewThreadSheet({ open, onClose }: { open: boolean; onClose: () => void 
               キャンセル
             </Button>
             <Button type="submit" disabled={busy || !title.trim() || !body.trim()}>
-              投稿
+              書き込む
             </Button>
           </SheetFooter>
         </form>

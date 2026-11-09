@@ -4,5 +4,6 @@
 @import "../packages/ui/src/shell.css";
 @import "../apps/forum/src/forum.css";
 @import "../apps/things/src/things.css";
+@import "../packages/ask-ai/src/ask-ai.css";
 @source "../apps";
 @source "../packages";

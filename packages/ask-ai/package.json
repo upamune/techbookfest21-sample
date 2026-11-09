@@ -1,0 +1,22 @@
+{
+  "name": "@pocket/ask-ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./ask-ai-button": "./src/ask-ai-button.tsx",
+    "./server": "./src/server.ts",
+    "./tool-definitions": "./src/tool-definitions.ts"
+  },
+  "dependencies": {
+    "@pocket/tools": "*",
+    "@pocket/ui": "*",
+    "@tanstack/ai": "1.2.0",
+    "@tanstack/ai-cloudflare": "1.2.0",
+    "@tanstack/ai-openai": "1.1.1",
+    "@tanstack/ai-react": "1.0.2",
+    "lucide-react": "1.69.0",
+    "react": "^19.2.4",
+    "zod": "^4.6.7"
+  }
+}

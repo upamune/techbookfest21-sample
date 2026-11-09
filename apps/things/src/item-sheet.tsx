@@ -2,11 +2,12 @@ import { useRef, useState, type FormEvent } from "react";
 import { callTool } from "@pocket/tools/request";
 import { useMutation } from "@pocket/tools/use-mutation";
 import { Button } from "@pocket/ui/button";
+import { CreatableSelect } from "@pocket/ui/creatable-select";
 import { ErrorNotice } from "@pocket/ui/feedback";
 import { Input } from "@pocket/ui/input";
 import { Sheet, SheetContent, SheetFooter, SheetTitle } from "@pocket/ui/sheet";
 import { Textarea } from "@pocket/ui/textarea";
-import { deletionOutput, itemOutput, type Item, type PhotoId } from "./contracts";
+import { deletionOutput, itemOutput, type Item, type ItemOptions, type PhotoId } from "./contracts";
 import { PhotoStrip } from "./photo-strip";
 import { uploadPhoto, type DraftPhoto } from "./upload";
 
@@ -22,11 +23,15 @@ function initialDraft(mode: ItemSheetMode): Draft {
 
 export function ItemSheet({
   mode,
+  options,
+  optionsFailed,
   onClose,
   onSaved,
   onDeleted,
 }: {
   mode: ItemSheetMode | null;
+  options: ItemOptions;
+  optionsFailed: boolean;
   onClose: () => void;
   onSaved: () => void;
   onDeleted: (item: Item) => void;
@@ -42,6 +47,8 @@ export function ItemSheet({
         <ItemForm
           key={mode.kind === "edit" ? mode.item.id : "add"}
           mode={mode}
+          options={options}
+          optionsFailed={optionsFailed}
           onClose={onClose}
           onSaved={onSaved}
           onDeleted={onDeleted}
@@ -53,11 +60,15 @@ export function ItemSheet({
 
 function ItemForm({
   mode,
+  options,
+  optionsFailed,
   onClose,
   onSaved,
   onDeleted,
 }: {
   mode: ItemSheetMode;
+  options: ItemOptions;
+  optionsFailed: boolean;
   onClose: () => void;
   onSaved: () => void;
   onDeleted: (item: Item) => void;
@@ -153,28 +164,23 @@ function ItemForm({
             onChange={(event) => setField("name", event.target.value)}
           />
         </label>
-        <label className="field">
-          <span className="field-label">しまった場所</span>
-          <Input
-            value={draft.location}
-            maxLength={80}
-            enterKeyHint="next"
-            placeholder="例: 玄関の棚"
-            readOnly={busy}
-            onChange={(event) => setField("location", event.target.value)}
-          />
-        </label>
+        <CreatableSelect
+          label="しまった場所"
+          value={draft.location}
+          options={options.locations}
+          maxLength={80}
+          disabled={busy}
+          onChange={(value) => setField("location", value)}
+        />
         <div className="field-row">
-          <label className="field">
-            <span className="field-label">カテゴリ</span>
-            <Input
-              value={draft.category}
-              maxLength={40}
-              enterKeyHint="next"
-              readOnly={busy}
-              onChange={(event) => setField("category", event.target.value)}
-            />
-          </label>
+          <CreatableSelect
+            label="カテゴリ"
+            value={draft.category}
+            options={options.categories}
+            maxLength={40}
+            disabled={busy}
+            onChange={(value) => setField("category", value)}
+          />
           <label className="field field-quantity">
             <span className="field-label">個数</span>
             <Input
@@ -200,6 +206,9 @@ function ItemForm({
             onChange={(event) => setField("note", event.target.value)}
           />
         </label>
+        {optionsFailed && (
+          <ErrorNotice message="場所とカテゴリの候補を読み込めませんでした。新しく追加はできます。" />
+        )}
         {error && <ErrorNotice message={error} />}
         <SheetFooter>
           {mode.kind === "edit" && (

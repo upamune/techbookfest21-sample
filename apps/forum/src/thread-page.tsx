@@ -1,28 +1,41 @@
-import { useCallback, useRef, useState, type FormEvent } from "react";
-import { useParams, useRouter } from "@void/react";
-import { MessagesSquare, SendHorizontal, Trash2 } from "lucide-react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { useParams } from "@void/react";
+import { Archive, ArrowUp, Trash2 } from "lucide-react";
 import { callTool } from "@pocket/tools/request";
 import { useMutation } from "@pocket/tools/use-mutation";
-import { forgetLoadedResults, useToolQuery } from "@pocket/tools/use-tool-query";
+import { forgetLoadedResults, useToolQuery, type QueryState } from "@pocket/tools/use-tool-query";
+import { AskAiButton } from "@pocket/ask-ai/ask-ai-button";
 import { AppBar } from "@pocket/ui/app-bar";
 import { Button } from "@pocket/ui/button";
-import { EmptyState, ErrorNotice, Snackbar, type SnackbarMessage } from "@pocket/ui/feedback";
+import { ErrorNotice, Snackbar, type SnackbarMessage } from "@pocket/ui/feedback";
 import { formatRelativeTime } from "@pocket/ui/format";
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetTitle } from "@pocket/ui/sheet";
 import { Skeleton } from "@pocket/ui/skeleton";
+import { submitOnCommandEnter } from "@pocket/ui/submit-shortcut";
 import { Textarea } from "@pocket/ui/textarea";
 import {
+  archiveOutput,
   deletionOutput,
   replyOutput,
   threadDetailOutput,
   threadId as threadIdSchema,
+  type AuthorKind,
   type Reply,
+  type ThreadDetail,
   type ThreadId,
 } from "./contracts";
 import { AuthorLabel } from "./author-label";
+import { splitAnchors } from "./post-format";
 import { webAuthorName } from "./web-author";
 
 const forumPage = { label: "Forum", href: "/forum" } as const;
+const openingPostNumber = 1;
 
 export function ThreadPage() {
   const params = useParams<{ id: string }>();
@@ -45,11 +58,31 @@ function ThreadView({ id }: { id: ThreadId }) {
     input: { id },
     schema: threadDetailOutput,
   });
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [snackbar, setSnackbar] = useState<SnackbarMessage | null>(null);
   const dismissSnackbar = useCallback(() => setSnackbar(null), []);
   const removal = useMutation();
+  const archiving = useMutation();
+  const archived = "data" in state && state.data.thread.archivedAt !== null;
   const endRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const [draft, setDraft] = useState("");
+
+  function quote(number: number) {
+    setDraft((current) => `${current}>>${number}\n`);
+    composerRef.current?.focus();
+  }
+
+  function setArchived(next: boolean) {
+    void archiving.run(async () => {
+      await callTool({
+        name: "forum_set_thread_archived",
+        input: { id, archived: next },
+        schema: archiveOutput,
+      });
+      forgetLoadedResults("forum_list_threads");
+      await refresh();
+    });
+  }
 
   function removeReply(reply: Reply) {
     void removal.run(async () => {
@@ -60,10 +93,12 @@ function ThreadView({ id }: { id: ThreadId }) {
       });
       update((data) => ({
         ...data,
-        replies: data.replies.filter((item) => item.id !== reply.id),
+        replies: data.replies.map((item) =>
+          item.id === reply.id ? { kind: "deleted", id: item.id, number: item.number } : item,
+        ),
       }));
       setSnackbar({
-        text: "返信を削除しました",
+        text: `${reply.number}番を削除しました`,
         undo: () => {
           setSnackbar(null);
           void removal.run(async () => {
@@ -85,44 +120,45 @@ function ThreadView({ id }: { id: ThreadId }) {
         title="スレッド"
         parent={forumPage}
         actions={
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="スレッドを削除"
-            disabled={!("data" in state)}
-            onClick={() => setConfirmingDelete(true)}
-          >
-            <Trash2 aria-hidden="true" />
-          </Button>
+          <>
+            <AskAiButton
+              page={{ tool: "forum_get_thread", input: { id } }}
+              suggestions={["このスレッドを要約して", "次の返信案を考えて"]}
+            />
+            {!archived && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="スレッドをアーカイブ"
+                disabled={!("data" in state) || archiving.busy}
+                onClick={() => setArchived(true)}
+              >
+                <Archive aria-hidden="true" />
+              </Button>
+            )}
+          </>
         }
       />
       <main className="page thread-main" aria-busy={state.kind === "loading"}>
         {removal.error && <ErrorNotice message={removal.error} />}
-        {state.kind === "stale" && <ErrorNotice message={state.message} />}
-        {state.kind === "loading" && <ThreadSkeleton />}
-        {state.kind === "failed" && (
-          <ErrorNotice message={state.message} onRetry={() => void refresh()} />
-        )}
-        {"data" in state && (
-          <>
-            <article className="thread-head">
-              <h2 className="thread-title">{state.data.thread.title}</h2>
-              <p className="post-meta">
-                <AuthorLabel thread={state.data.thread} />
-                <span>{formatRelativeTime(state.data.thread.createdAt)}</span>
-              </p>
-              <p className="post-body">{state.data.thread.body}</p>
-            </article>
-            <h3 className="reply-heading">返信 {state.data.replies.length}</h3>
-            <ReplyList replies={state.data.replies} busy={removal.busy} onRemove={removeReply} />
-          </>
-        )}
+        {archiving.error && <ErrorNotice message={archiving.error} />}
+        <ThreadContent
+          state={state}
+          busy={removal.busy}
+          onRetry={() => void refresh()}
+          onQuote={quote}
+          onRemove={removeReply}
+        />
         <div ref={endRef} />
       </main>
-      {state.kind !== "failed" && (
+      {archived && <ArchivedNotice busy={archiving.busy} onRestore={() => setArchived(false)} />}
+      {state.kind !== "failed" && !archived && (
         <ReplyComposer
           threadId={id}
           enabled={"data" in state}
+          body={draft}
+          bodyRef={composerRef}
+          onBodyChange={setDraft}
           onReplied={(reply) => {
             update((data) => ({ ...data, replies: [...data.replies, reply] }));
             requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: "end" }));
@@ -130,53 +166,157 @@ function ThreadView({ id }: { id: ThreadId }) {
         />
       )}
       <Snackbar message={snackbar} onDismiss={dismissSnackbar} />
-      <DeleteThreadSheet
-        id={id}
-        open={confirmingDelete}
-        onClose={() => setConfirmingDelete(false)}
-      />
     </div>
   );
 }
 
-function ReplyList({
-  replies,
+function ThreadContent({
+  state,
   busy,
+  onRetry,
+  onQuote,
   onRemove,
 }: {
-  replies: Reply[];
+  state: QueryState<ThreadDetail>;
   busy: boolean;
+  onRetry: () => void;
+  onQuote: (number: number) => void;
   onRemove: (reply: Reply) => void;
 }) {
-  if (replies.length === 0)
-    return (
-      <EmptyState icon={MessagesSquare} title="まだ返信はありません">
-        下の入力欄から返信できます。
-      </EmptyState>
-    );
   return (
-    <ul className="reply-list">
-      {replies.map((reply) => (
-        <li key={reply.id} className="reply">
-          <div className="reply-header">
-            <p className="post-meta">
-              <AuthorLabel thread={reply} />
-              <span>{formatRelativeTime(reply.createdAt)}</span>
-            </p>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`${reply.authorName}の返信を削除`}
-              disabled={busy}
-              onClick={() => onRemove(reply)}
-            >
-              <Trash2 aria-hidden="true" />
-            </Button>
-          </div>
-          <p className="post-body">{reply.body}</p>
-        </li>
-      ))}
-    </ul>
+    <>
+      {state.kind === "stale" && <ErrorNotice message={state.message} />}
+      {state.kind === "loading" && <ThreadSkeleton />}
+      {state.kind === "failed" && <ErrorNotice message={state.message} onRetry={onRetry} />}
+      {"data" in state && (
+        <ThreadBody data={state.data} busy={busy} onQuote={onQuote} onRemove={onRemove} />
+      )}
+    </>
+  );
+}
+
+function ArchivedNotice({ busy, onRestore }: { busy: boolean; onRestore: () => void }) {
+  return (
+    <div className="reply-composer">
+      <div className="reply-composer-row thread-archived-row">
+        <p>アーカイブ済みのスレッドです</p>
+        <Button variant="outline" disabled={busy} onClick={onRestore}>
+          元に戻す
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ThreadBody({
+  data,
+  busy,
+  onQuote,
+  onRemove,
+}: {
+  data: ThreadDetail;
+  busy: boolean;
+  onQuote: (number: number) => void;
+  onRemove: (reply: Reply) => void;
+}) {
+  const lastNumber = data.replies.at(-1)?.number ?? openingPostNumber;
+  const open = data.thread.archivedAt === null;
+  const quote = open ? onQuote : null;
+  return (
+    <>
+      <article id={`res-${openingPostNumber}`} className="thread-head">
+        <h2 className="thread-title">{data.thread.title}</h2>
+        <PostHeader number={openingPostNumber} post={data.thread} onQuote={quote} />
+        <PostBody body={data.thread.body} lastNumber={lastNumber} />
+      </article>
+      <ol className="reply-list">
+        {data.replies.map((reply) => (
+          <li key={reply.id} id={`res-${reply.number}`} className="reply">
+            {reply.kind === "deleted" ? (
+              <p className="reply-deleted">
+                <span className="res-number">
+                  <span className="res-chip">{reply.number}</span>
+                </span>
+                このレスは削除されました
+              </p>
+            ) : (
+              <>
+                <PostHeader
+                  number={reply.number}
+                  post={reply}
+                  onQuote={quote}
+                  action={
+                    open && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`${reply.number}番の返信を削除`}
+                        disabled={busy}
+                        onClick={() => onRemove(reply)}
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </Button>
+                    )
+                  }
+                />
+                <PostBody body={reply.body} lastNumber={lastNumber} />
+              </>
+            )}
+          </li>
+        ))}
+      </ol>
+    </>
+  );
+}
+
+function PostHeader({
+  number,
+  post,
+  action,
+  onQuote,
+}: {
+  number: number;
+  post: { authorKind: AuthorKind; authorName: string; createdAt: string };
+  action?: ReactNode;
+  onQuote: ((number: number) => void) | null;
+}) {
+  const chip = <span className="res-chip">{number}</span>;
+  return (
+    <div className="post-header">
+      {onQuote === null ? (
+        <span className="res-number">{chip}</span>
+      ) : (
+        <button
+          type="button"
+          className="res-number"
+          aria-label={`${number}番にレス`}
+          onClick={() => onQuote(number)}
+        >
+          {chip}
+        </button>
+      )}
+      <p className="post-byline">
+        <AuthorLabel thread={post} />
+        <time dateTime={post.createdAt}>{formatRelativeTime(post.createdAt)}</time>
+      </p>
+      {action}
+    </div>
+  );
+}
+
+function PostBody({ body, lastNumber }: { body: string; lastNumber: number }) {
+  return (
+    <p className="post-body">
+      {splitAnchors(body).map((part) =>
+        part.kind === "anchor" && part.number >= openingPostNumber && part.number <= lastNumber ? (
+          <a key={part.start} className="res-anchor" href={`#res-${part.number}`}>
+            {part.text}
+          </a>
+        ) : (
+          <span key={part.start}>{part.text}</span>
+        ),
+      )}
+    </p>
   );
 }
 
@@ -190,16 +330,18 @@ function ThreadSkeleton() {
         <h2 className="thread-title">
           <Skeleton className="skeleton-line" style={{ width: "70%" }} />
         </h2>
-        <p className="post-meta">
-          <Skeleton className="skeleton-line skeleton-meta" />
-        </p>
+        <div className="post-header">
+          <span className="res-number">
+            <Skeleton className="res-chip" />
+          </span>
+          <p className="post-byline">
+            <Skeleton className="skeleton-line skeleton-meta" />
+          </p>
+        </div>
         <p className="post-body">
           <Skeleton className="skeleton-line" />
         </p>
       </div>
-      <h3 className="reply-heading" aria-hidden="true">
-        <Skeleton className="skeleton-line skeleton-meta" />
-      </h3>
     </>
   );
 }
@@ -207,14 +349,19 @@ function ThreadSkeleton() {
 function ReplyComposer({
   threadId,
   enabled,
+  body,
+  bodyRef,
+  onBodyChange,
   onReplied,
 }: {
   threadId: ThreadId;
   enabled: boolean;
+  body: string;
+  bodyRef: RefObject<HTMLTextAreaElement | null>;
+  onBodyChange: (body: string) => void;
   onReplied: (reply: Reply) => void;
 }) {
   const { busy, error, run } = useMutation();
-  const [body, setBody] = useState("");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -224,82 +371,39 @@ function ReplyComposer({
         input: { requestId, threadId, authorName: webAuthorName, body },
         schema: replyOutput,
       });
-      setBody("");
+      onBodyChange("");
       setRequestId(crypto.randomUUID());
       onReplied(reply);
     });
   }
   return (
-    <form className="reply-composer" onSubmit={(event) => void submit(event)}>
+    <form
+      className="reply-composer"
+      onSubmit={(event) => void submit(event)}
+      onKeyDown={submitOnCommandEnter}
+    >
       {error && <ErrorNotice message={error} />}
       <div className="reply-composer-row">
         <Textarea
+          ref={bodyRef}
           aria-label="返信"
-          placeholder="返信を入力"
+          placeholder="レスを書く"
           value={body}
           maxLength={2000}
           rows={1}
           disabled={!enabled}
           readOnly={busy}
-          onChange={(event) => setBody(event.target.value)}
+          onChange={(event) => onBodyChange(event.target.value)}
         />
         <Button
           type="submit"
           size="icon"
-          aria-label="送信"
+          aria-label="書き込む"
           disabled={busy || !enabled || !body.trim()}
         >
-          <SendHorizontal aria-hidden="true" />
+          <ArrowUp aria-hidden="true" />
         </Button>
       </div>
     </form>
-  );
-}
-
-function DeleteThreadSheet({
-  id,
-  open,
-  onClose,
-}: {
-  id: ThreadId;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const router = useRouter();
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  const { busy, error, run } = useMutation();
-  async function confirm() {
-    await run(async () => {
-      await callTool({
-        name: "forum_set_thread_deleted",
-        input: { id, deleted: true },
-        schema: deletionOutput,
-      });
-      forgetLoadedResults("forum_list_threads");
-      onClose();
-      await router.visit("/forum");
-    });
-  }
-  return (
-    <Sheet
-      open={open}
-      onOpenChange={(next) => {
-        if (!next && !busy) onClose();
-      }}
-    >
-      <SheetContent initialFocus={cancelRef}>
-        <SheetTitle>スレッドを削除しますか？</SheetTitle>
-        <SheetDescription>一覧から消えます。データはMCPから元に戻せます。</SheetDescription>
-        {error && <ErrorNotice message={error} />}
-        <SheetFooter>
-          <Button ref={cancelRef} variant="outline" disabled={busy} onClick={onClose}>
-            キャンセル
-          </Button>
-          <Button variant="destructive" disabled={busy} onClick={() => void confirm()}>
-            削除する
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
   );
 }

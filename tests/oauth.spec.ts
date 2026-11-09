@@ -116,6 +116,20 @@ test.beforeAll(() => {
   database.close();
 });
 
+async function holdRequests(page: Page, patterns: string[]) {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  for (const pattern of patterns) {
+    await page.route(pattern, async (route) => {
+      await held;
+      await route.continue();
+    });
+  }
+  return release;
+}
+
 test("unauthenticated MCP requests lead clients to the authorization server", async ({
   request,
 }) => {
@@ -145,14 +159,12 @@ test("a person approves a client on their phone and MCP accepts its token", asyn
   await context.addCookies([sessionCookie()]);
   const { url, verifier } = authorizationUrl(clientId);
 
-  await page.route("**/api/auth/oauth2/public-client**", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    await route.continue();
-  });
+  const release = await holdRequests(page, ["**/api/auth/oauth2/public-client**"]);
   await page.goto(url);
   const approve = page.getByRole("button", { name: "許可する" });
   await expect(approve).toBeDisabled();
   const loadingBox = await approve.boundingBox();
+  release();
   await expect(page.getByRole("heading", { name: "E2E Client を接続しますか？" })).toBeVisible();
   await expect(page.getByText("未確認（名前はアプリの自己申告です）")).toBeVisible();
   await expect(page.getByText("localhost:33418")).toBeVisible();
@@ -192,12 +204,7 @@ test("a person approves a client on their phone and MCP accepts its token", asyn
   });
   expect(rest.status()).toBe(401);
 
-  for (const path of ["**/api/oauth-connections", "**/api/tokens"]) {
-    await page.route(path, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      await route.continue();
-    });
-  }
+  const releaseLists = await holdRequests(page, ["**/api/oauth-connections", "**/api/tokens"]);
   await page.goto("/settings");
   const connections = page.getByRole("region", { name: "接続中のアプリ" });
   const skeletonRow = connections.locator(".settings-row");
@@ -205,7 +212,9 @@ test("a person approves a client on their phone and MCP accepts its token", asyn
   const loadingRow = await skeletonRow.boundingBox();
   const tokens = page.getByRole("region", { name: "API・MCPアクセストークン" });
   const tokenRow = tokens.locator(".settings-row");
+  await expect(tokenRow).toHaveCount(1);
   const loadingTokenRow = await tokenRow.boundingBox();
+  releaseLists();
   await expect(tokens.getByText("発行したトークンはありません。")).toBeVisible();
   expect(await tokenRow.boundingBox()).toEqual(loadingTokenRow);
   const disconnect = page.getByRole("button", { name: "E2E Client の接続を解除" });

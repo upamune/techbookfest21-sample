@@ -89,7 +89,7 @@ export async function respondToAskAi({
   const abortController = new AbortController();
   signal.addEventListener("abort", () => abortController.abort(signal.reason), { once: true });
   const stream = chat({
-    adapter: adapter ?? createAdapter({ environment, threadId: params.threadId }),
+    adapter: adapter ?? createAdapter({ environment }),
     messages: params.messages,
     threadId: params.threadId,
     runId: params.runId,

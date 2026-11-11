@@ -51,7 +51,6 @@ const handler = defineHandler(async (context) => {
       model: env.POCKET_AI_MODEL,
       workersAi: ai,
       ollamaApiKey: env.OLLAMA_API_KEY,
-      opencodeApiKey: env.OPENCODE_API_KEY,
       baseUrl: env.POCKET_AI_BASE_URL,
       apiKey: env.POCKET_AI_API_KEY,
     },

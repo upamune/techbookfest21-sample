@@ -18,12 +18,11 @@ export type AskAiEnvironment = {
   model?: string;
   workersAi: { run: WorkersAiRun };
   ollamaApiKey?: string;
-  opencodeApiKey?: string;
   baseUrl?: string;
   apiKey?: string;
 };
 
-type ProviderRequest = { model: string; environment: AskAiEnvironment; threadId: string };
+type ProviderRequest = { model: string; environment: AskAiEnvironment };
 type AskAiProvider = {
   defaultModel?: string;
   createAdapter: (request: ProviderRequest) => AnyTextAdapter;
@@ -81,16 +80,6 @@ const providers = {
         apiKey: required(environment.ollamaApiKey, "OLLAMA_API_KEY"),
       }),
   },
-  "opencode-go": {
-    defaultModel: "glm-5.3-flash",
-    createAdapter: ({ model, environment, threadId }) =>
-      openaiCompatibleText(model, {
-        name: "opencode-go",
-        baseURL: "https://opencode.ai/inference/go/openai/v1",
-        apiKey: required(environment.opencodeApiKey, "OPENCODE_API_KEY"),
-        defaultHeaders: { "User-Agent": "pocket-ask-ai/0.3.0", "x-opencode-session": threadId },
-      }),
-  },
   "openai-compatible": {
     createAdapter: ({ model, environment }) =>
       openaiCompatibleText(model, {
@@ -105,16 +94,10 @@ function isProviderId(id: string): id is keyof typeof providers {
   return Object.hasOwn(providers, id);
 }
 
-export function createAdapter({
-  environment,
-  threadId,
-}: {
-  environment: AskAiEnvironment;
-  threadId: string;
-}): AnyTextAdapter {
+export function createAdapter({ environment }: { environment: AskAiEnvironment }): AnyTextAdapter {
   if (!isProviderId(environment.provider))
     throw new AskAiUnavailableError(`未対応の接続先です: ${environment.provider}`);
   const provider: AskAiProvider = providers[environment.provider];
   const model = required(environment.model || provider.defaultModel, "POCKET_AI_MODEL");
-  return provider.createAdapter({ model, environment, threadId });
+  return provider.createAdapter({ model, environment });
 }

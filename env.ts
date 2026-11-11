@@ -6,7 +6,6 @@ export default defineEnv({
   POCKET_AI_BASE_URL: string().optional(),
   POCKET_AI_API_KEY: string().optional(),
   OLLAMA_API_KEY: string().optional(),
-  OPENCODE_API_KEY: string().optional(),
   POCKET_ALLOWED_GOOGLE_SUBS: string().default("[]"),
   AUTH_GOOGLE_CLIENT_ID: string().optional(),
   AUTH_GOOGLE_CLIENT_SECRET: string().optional(),

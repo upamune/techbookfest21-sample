@@ -63,7 +63,6 @@ Forumの投稿者は入口で決まります。画面からの投稿は名前を
 | -------------------- | --------------------- | -------------------------------------------------------------------- |
 | `workers-ai`（既定） | Cloudflare Workers AI | `void connect --platform cloudflare`                                 |
 | `ollama-cloud`       | Ollama Cloud          | `OLLAMA_API_KEY`                                                     |
-| `opencode-go`        | OpenCode Go           | `OPENCODE_API_KEY`                                                   |
 | `openai-compatible`  | OpenAI互換の任意のAPI | `POCKET_AI_BASE_URL`、`POCKET_AI_MODEL`、必要なら`POCKET_AI_API_KEY` |
 
 モデルは`POCKET_AI_MODEL`で変更できます。接続先を増やすときは、`packages/ask-ai/src/providers.ts`にTanStack AIのアダプターを返す項目を1つ足します。HTTP以外の接続先は`BaseTextAdapter`を実装します。
